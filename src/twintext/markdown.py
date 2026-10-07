@@ -19,6 +19,8 @@ PROTECTED = re.compile(
     r"[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}|"
     r"(?<!\w)(?:/|~/|\./|\.\./)[\w./@%+~:=-]+|"
     r"(?<!\w)[A-Za-z]:\\[\w.\\/@%+~:=-]+|"
+    r"(?<![\w/])(?:[\w.@+-]+/)*[\w.@+-]+\.(?:py|js|ts|tsx|jsx|rs|go|java|c|cpp|h|hpp|cs|"
+    r"md|txt|json|yaml|yml|toml|sh|html|css|png|jpg|jpeg|svg|pdf|docx|xlsx|sqlite3)(?::\d+)?(?![\w/])|"
     r"\$(?!\d+(?:[.,]\d+)*(?:\s|$))[^$\n]+\$(?!\d)|\\\([^\n]*?\\\)|"
     r"[$€£¥]\d[\d,.]*(?!\w)|"
     r':{1,2}codex-[\w-]+\{(?:"(?:\\.|[^"\\])*"|[^{}\n"])*\}|'

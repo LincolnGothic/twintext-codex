@@ -204,6 +204,16 @@ class MarkdownFormatTests(unittest.TestCase):
         self.assertIn(directive, value)
         self.assertTrue(all("codex-annotation" not in call for call in self.engine.calls))
 
+    def test_file_link_labels_and_relative_paths_keep_their_identifiers(self):
+        text = "Read [app.py](/tmp/app.py:12), src/app.ts, and [Instructions](/tmp/README.md).\n"
+        value = self.service.translate(text, mode="translated")["translation"]
+        self.assertIn("[app.py](/tmp/app.py:12)", value)
+        self.assertIn("src/app.ts", value)
+        self.assertIn("[译:Instructions](/tmp/README.md)", value)
+        self.assertTrue(
+            all("app.py" not in call and "app.ts" not in call for call in self.engine.calls)
+        )
+
     def test_incomplete_or_malformed_markdown_preserves_source_without_crashing(self):
         for text in (
             "[Broken](https://example.com",

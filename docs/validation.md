@@ -2,7 +2,7 @@
 
 Validated on Linux x86-64 with Python 3.12 on October 7, 2026:
 
-- **59 unit/integration tests passed.** New coverage includes table structure in both display modes, nested lists, heading styles, checkboxes, quotes, reference/inline link labels, code brackets in labels, footnotes, currencies, math, HTML/code/diagram preservation, malformed Markdown, cache limits and independent clearing, and floating-button drag versus click.
+- **60 unit/integration tests passed.** New coverage includes table structure in both display modes, nested lists, heading styles, checkboxes, quotes, reference/inline link labels, code brackets in labels, footnotes, currencies, file links, math, HTML/code/diagram preservation, malformed Markdown, cache limits and independent clearing, and floating-button drag versus click.
 - **Real models passed in four translation directions:** English → Chinese, Japanese, French and Spanish on the same mixed table/list/link/quote/code sample. Headers and cell text translated; numeric cells, table shape, URL and code remained intact. [Raw synthetic results](format-smoke.json).
 - Qt rendered the Chinese bilingual and translation-only outputs correctly; [table screenshot](tables.png). The [collapsed control](floating-button.png) has a visible grip; tests verify that both the grip and a deliberate button drag request a window move, while only a click expands. Actual desktop movement depends on compositor support for Qt's system-move request.
 - Clearing 10,000 synthetic cache entries took approximately **0.5 ms** in the isolated local test; no user records were deleted. Turning caching off preserves existing entries. Clearing translations does not remove received replies or change preferences.
