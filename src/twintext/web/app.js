@@ -128,7 +128,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.2.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.2.1"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }

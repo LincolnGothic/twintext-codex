@@ -1,4 +1,14 @@
-# v0.2.0 validation
+# v0.2.1 validation
+
+Validated on October 7, 2026 with installed Codex 0.162.0-alpha.2:
+
+- The old portable package produced **zero hooks** in both `plugin/read` and `hooks/list`, while its skills and MCP server were visible. The runtime explicitly skips hooks for Agent Plugins manifests, matching [upstream source](https://github.com/openai/codex/blob/main/codex-rs/core-plugins/src/loader.rs) and [issue #47925](https://github.com/openai/codex/issues/47925).
+- The corrected Codex compatibility package exposed **one Stop hook** and the TwinText MCP server, both from the repository marketplace and after installation/cache refresh. `hooks/list` confirmed the command points to the installed 0.2.1 capture script, is enabled, and is **untrusted**. User review is still required before live automatic delivery can be confirmed.
+- **41 unit/integration tests passed**, including a regression check that no portable manifest shadows the hook package. Ruff, JavaScript syntax, and installer shell syntax passed.
+- `scripts/check-codex-plugin.py` checks real runtime package discovery without starting a model turn or changing hook trust. It is separate from synthetic stdin/translation tests.
+- Saved Chinese/bilingual preferences and all eight installed models were preserved. The floating window remains running.
+
+## v0.2.0 local translation validation
 
 Validated on Linux x86-64 with Python 3.12 on October 7, 2026.
 

@@ -45,6 +45,8 @@ else
 fi
 # Hook scripts resolve the same private runtime after Codex caches the plugin.
 mkdir -p "$task_app/plugin"
+# Remove our old portable manifests: Codex prefers them and skips bundled hooks.
+rm -f "$task_app/plugin/plugin.json" "$task_app/plugin/mcp.json"
 cp -R "$task_repo/plugins/twintext/." "$task_app/plugin/"
 "$task_app/venv/bin/python" "$task_repo/scripts/register-plugin.py" "$task_app/plugin"
 "$task_app/venv/bin/python" "$task_repo/scripts/register-desktop.py" "$task_app"

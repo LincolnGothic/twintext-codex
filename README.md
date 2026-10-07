@@ -49,6 +49,8 @@ After installation or upgrade:
 
 Without trusted hooks, the reader waits for replies; **Paste text** still works. No Codex application files are patched.
 
+**Upgrading from 0.2.0:** that release's portable `plugin.json` package was ignored for hook discovery by Codex, even with hooks enabled. Version 0.2.1 uses `.codex-plugin/plugin.json` and `.mcp.json`, and the installer removes TwinText's obsolete root manifests. Reinstall/update the plugin, then open **Codex Settings → Hooks** to review its Stop command. The expected command is `python3 "${PLUGIN_ROOT}/hooks/capture.py"`. If no TwinText hook appears, it has not been discovered; restarting or trusting the project alone cannot fix that. See [the upstream loader](https://github.com/openai/codex/blob/main/codex-rs/core-plugins/src/loader.rs) and [reported issue](https://github.com/openai/codex/issues/47925).
+
 ## Floating controls
 
 - **Collapse** reduces the reader to a compact `TT ↔` button. Drag its small handle to move it; click the button to expand. `TT ●` means a new reply arrived.
@@ -108,6 +110,7 @@ python3.12 -m venv .venv
 .venv/bin/ruff check .
 node --check src/twintext/web/app.js
 bash -n scripts/install-linux.sh
+python scripts/check-codex-plugin.py --codex /path/to/codex
 ```
 
 The desktop tests use Qt's offscreen platform and an injected translator. They verify the hook contract, bounded/concurrent capture, stale-result handling, display modes, all interface languages, and unchanged original replies. For a real-model desktop smoke check, first install the starter models, then run:

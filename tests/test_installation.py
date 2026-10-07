@@ -16,6 +16,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstallationTests(unittest.TestCase):
+    def test_codex_package_exposes_capture_hook_without_portable_shadow(self):
+        plugin = ROOT / "plugins/twintext"
+        self.assertFalse((plugin / "plugin.json").exists())
+        manifest = json.loads((plugin / ".codex-plugin/plugin.json").read_text())
+        hooks = json.loads((plugin / manifest["hooks"]).read_text())
+        self.assertEqual(list(hooks["hooks"]), ["Stop"])
+        command = hooks["hooks"]["Stop"][0]["hooks"][0]["command"]
+        self.assertIn("${PLUGIN_ROOT}/hooks/capture.py", command)
+        mcp = json.loads((plugin / manifest["mcpServers"]).read_text())
+        self.assertIn("twintext", mcp["mcpServers"])
+        self.assertTrue((plugin / manifest["skills"]).is_dir())
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
