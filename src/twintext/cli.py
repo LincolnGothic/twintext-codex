@@ -29,6 +29,8 @@ def parser():
     settings.add_argument("--ui-language", choices=["auto", *LANGUAGES])
     settings.add_argument("--enabled", choices=["true", "false"])
     settings.add_argument("--cache", choices=["true", "false"])
+    settings.add_argument("--desktop-auto-start", choices=["true", "false"])
+    settings.add_argument("--always-on-top", choices=["true", "false"])
     commands.add_parser("status", help="Inspect settings and installed models")
     models = commands.add_parser("models", help="Manage offline language models")
     operations = models.add_subparsers(dest="operation", required=True)
@@ -39,7 +41,10 @@ def parser():
     install.add_argument("--target", choices=list(LANGUAGES))
     commands.add_parser("clear-cache", help="Remove cached translations")
     commands.add_parser("mcp", help="Serve local MCP over stdio")
-    commands.add_parser("context", help="Print Codex hook context")
+    commands.add_parser("context", help="Compatibility command; no model context is emitted")
+    commands.add_parser("capture", help="Receive a Codex Stop event on stdin (no model calls)")
+    desktop = commands.add_parser("desktop", help="Open the floating desktop reader")
+    desktop.add_argument("--background", action="store_true", help="Start as a compact button")
     ui = commands.add_parser("ui", help="Open the settings page on localhost")
     ui.add_argument("--port", type=int, default=0)
     ui.add_argument("--open", action="store_true", dest="open_browser")
@@ -53,6 +58,19 @@ def main(argv=None):
             from twintext.mcp import serve
 
             serve()
+        elif args.command == "capture":
+            from twintext.bridge import capture
+
+            capture(sys.stdin)
+            print("{}")
+        elif args.command == "desktop":
+            try:
+                from twintext.desktop import run
+            except ImportError as exc:
+                raise TwinTextError(
+                    "Desktop dependencies are missing. Rerun scripts/install-linux.sh."
+                ) from exc
+            return run(background=args.background)
         elif args.command == "ui":
             from twintext.ui import serve
 
@@ -70,10 +88,19 @@ def main(argv=None):
         elif args.command == "settings":
             changes = {
                 key: getattr(args, key)
-                for key in ("source", "target", "mode", "ui_language", "enabled", "cache")
+                for key in (
+                    "source",
+                    "target",
+                    "mode",
+                    "ui_language",
+                    "enabled",
+                    "cache",
+                    "desktop_auto_start",
+                    "always_on_top",
+                )
                 if getattr(args, key) is not None
             }
-            for key in ("enabled", "cache"):
+            for key in ("enabled", "cache", "desktop_auto_start", "always_on_top"):
                 if key in changes:
                     changes[key] = changes[key] == "true"
             value = update_settings(**changes) if changes else load_settings()

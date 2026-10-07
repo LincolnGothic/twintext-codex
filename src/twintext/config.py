@@ -47,6 +47,9 @@ class Settings:
     enabled: bool = True
     cache: bool = True
     ui_language: str = "auto"
+    host_locale: str = "auto"
+    desktop_auto_start: bool = True
+    always_on_top: bool = True
 
     def validate(self):
         if self.source not in ("auto", *LANGUAGES):
@@ -57,8 +60,13 @@ class Settings:
             raise TwinTextError("Mode must be bilingual, translated, or original.")
         if self.ui_language not in ("auto", *LANGUAGES):
             raise TwinTextError("UI language must be auto, en, zh, ja, fr, or es.")
-        if type(self.enabled) is not bool or type(self.cache) is not bool:
-            raise TwinTextError("Enabled and cache must be true or false.")
+        if self.host_locale not in ("auto", *LANGUAGES):
+            raise TwinTextError("Host locale must be auto, en, zh, ja, fr, or es.")
+        if any(
+            type(value) is not bool
+            for value in (self.enabled, self.cache, self.desktop_auto_start, self.always_on_top)
+        ):
+            raise TwinTextError("Enabled, cache, auto-start and always-on-top must be booleans.")
         return self
 
     def as_dict(self):

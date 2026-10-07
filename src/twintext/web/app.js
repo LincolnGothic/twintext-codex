@@ -9,6 +9,8 @@
     fr: {tagline:"Traduction hors ligne pour Codex",local:"Sur votre ordinateur",eyebrow:"DEUX LANGUES. UNE CONVERSATION.",headline:"Lisez à votre façon.",intro:"Comparez l’original et sa traduction, ou concentrez-vous sur la traduction.",preferences:"Préférences",target:"Traduire en",source:"Langue source",display:"Mode d’affichage",bilingual:"Bilingue",both:"Original + traduction",translated:"Traduction seule",translationOnly:"Une lecture ciblée",original:"Original",originalOnly:"Suspendre la traduction",uiLanguage:"Langue du plugin",followHint:"Le mode automatique suit la langue de Codex dans le panneau intégré, ou celle de votre navigateur ici.",enabled:"Traduire les nouvelles réponses de Codex",cache:"Mémoriser les traductions localement",save:"Enregistrer",nextReply:"Ces préférences s’appliquent aux nouvelles réponses des conversations où TwinText est activé.",preview:"Essayer une traduction",private:"Confidentiel par défaut",inputLabel:"Texte à traduire",placeholder:"Collez un paragraphe ou une réponse Markdown…",preserve:"Le code, les chemins et les liens sont préservés.",translate:"Traduire",empty:"Votre traduction apparaîtra ici.",copy:"Copier le texte affiché",models:"Pack de langues",noFees:"Aucun frais d’API",modelInfo:"Anglais, chinois, japonais, français et espagnol. Téléchargez une fois, puis traduisez hors ligne.",install:"Télécharger le pack de cinq langues",clearCache:"Effacer les traductions mémorisées",footer:"Pour une lecture plus sereine et plus claire.",auto:"Détection automatique",follow:"Automatique · suivre la langue de l’hôte",en:"Anglais",zh:"Chinois",ja:"Japonais",fr:"Français",es:"Espagnol",saved:"Préférences enregistrées.",working:"Traduction…",downloading:"Téléchargement des modèles…",installed:"Pack de langues prêt.",modelCount:"{count} modèles sur 8 installés",missing:"Téléchargez le pack de langues pour commencer.",copied:"Copié.",cleared:"Traductions mémorisées effacées.",pasteFirst:"Ajoutez d’abord du texte.",route:"Parcours de traduction",ready:"Les cinq langues sont prêtes.",copyFailed:"Sélectionnez le texte affiché et copiez-le manuellement."},
     es: {tagline:"Traducción sin conexión para Codex",local:"En tu ordenador",eyebrow:"DOS IDIOMAS. UNA CONVERSACIÓN.",headline:"Lee a tu manera.",intro:"Compara el original y su traducción, o céntrate solo en la traducción.",preferences:"Preferencias",target:"Traducir al",source:"Idioma de origen",display:"Modo de visualización",bilingual:"Bilingüe",both:"Original + traducción",translated:"Solo traducción",translationOnly:"Una lectura centrada",original:"Original",originalOnly:"Pausar la traducción",uiLanguage:"Idioma del complemento",followHint:"El modo automático sigue el idioma de Codex en un panel integrado, o el de tu navegador aquí.",enabled:"Traducir las nuevas respuestas de Codex",cache:"Guardar traducciones localmente",save:"Guardar preferencias",nextReply:"Estas preferencias se aplican a las nuevas respuestas de los chats con TwinText activado.",preview:"Probar una traducción",private:"Privado por defecto",inputLabel:"Texto para traducir",placeholder:"Pega un párrafo o una respuesta Markdown…",preserve:"El código, las rutas y los enlaces se conservan.",translate:"Traducir",empty:"Tu traducción aparecerá aquí.",copy:"Copiar el texto mostrado",models:"Paquete de idiomas",noFees:"Sin costes de API",modelInfo:"Inglés, chino, japonés, francés y español. Descárgalo una vez y traduce sin conexión.",install:"Descargar el paquete de cinco idiomas",clearCache:"Borrar traducciones guardadas",footer:"Para una lectura más tranquila y clara.",auto:"Detectar automáticamente",follow:"Automático · seguir el idioma del anfitrión",en:"Inglés",zh:"Chino",ja:"Japonés",fr:"Francés",es:"Español",saved:"Preferencias guardadas.",working:"Traduciendo…",downloading:"Descargando modelos…",installed:"Paquete de idiomas listo.",modelCount:"{count} de 8 modelos instalados",missing:"Descarga el paquete de idiomas para empezar.",copied:"Copiado.",cleared:"Traducciones guardadas borradas.",pasteFirst:"Añade texto primero.",route:"Ruta de traducción",ready:"Los cinco idiomas están listos.",copyFailed:"Selecciona el texto mostrado y cópialo manualmente."}
   };
+  const desktopWords = {"en": {"openDesktop": "Open floating reader", "desktopOpened": "Floating reader opened.", "nextReply": "Completed replies appear in the floating reader. Translations stay outside the chat."}, "zh": {"openDesktop": "打开浮动阅读窗口", "desktopOpened": "已打开浮动阅读窗口。", "nextReply": "完整回复显示在浮动窗口中，译文不会进入聊天上下文。"}, "ja": {"openDesktop": "フローティングリーダーを開く", "desktopOpened": "リーダーを開きました。", "nextReply": "完了した返信は別のウィンドウに表示され、翻訳はチャットに追加されません。"}, "fr": {"openDesktop": "Ouvrir le lecteur flottant", "desktopOpened": "Lecteur flottant ouvert.", "nextReply": "Les réponses terminées apparaissent dans le lecteur flottant. Les traductions restent hors du chat."}, "es": {"openDesktop": "Abrir el lector flotante", "desktopOpened": "Lector flotante abierto.", "nextReply": "Las respuestas completas aparecen en el lector flotante. Las traducciones quedan fuera del chat."}};
+  for (const [code, words] of Object.entries(desktopWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
   let bridgeId = 0;
   const pending = new Map();
@@ -32,6 +34,7 @@
     } else if (message.method === "ui/notifications/host-context-changed") {
       hostLocale = message.params?.locale ?? message.params?.hostContext?.locale ?? hostLocale;
       localize();
+      tool("twintext_set_settings", {host_locale:baseLocale(hostLocale)}).catch(() => {});
     }
   });
   async function tool(name, args = {}) {
@@ -91,6 +94,10 @@
   function displayText() {
     return lastResult.blocks.map(block => mode() === "original" ? block.original : mode() === "bilingual" && block.original !== block.translation ? block.original.replace(/\n+$/, "") + "\n\n" + block.translation : block.translation).join("");
   }
+  $("open-desktop").addEventListener("click", async () => {
+    try { await tool("twintext_open_desktop"); notify(t("desktopOpened")); }
+    catch (error) { notify(error.message, true); }
+  });
   $("ui-language").addEventListener("change", localize);
   document.querySelectorAll("input[name=mode]").forEach(input => input.addEventListener("change", renderResult));
   $("settings-form").addEventListener("submit", async event => {
@@ -121,11 +128,14 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.1.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.2.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }
       lastStatus = await tool("twintext_status");
+      if (boot.embedded && lastStatus.settings.host_locale !== baseLocale(hostLocale)) {
+        lastStatus = await tool("twintext_set_settings", {host_locale:baseLocale(hostLocale)});
+      }
       const settings = lastStatus.settings;
       $("target").value = settings.target; $("source").value = settings.source; $("ui-language").value = settings.ui_language;
       document.querySelector(`input[name=mode][value=${settings.mode}]`).checked = true;

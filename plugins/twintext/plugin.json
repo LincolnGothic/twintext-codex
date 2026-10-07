@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "twintext",
-  "version": "0.1.0",
-  "description": "Offline bilingual replies for Codex on Linux using Argos Translate.",
+  "version": "0.2.0",
+  "description": "Offline floating translation companion for Codex on Linux.",
   "author": {"name": "LincolnGothic"},
   "license": "MIT",
   "repository": "https://github.com/LincolnGothic/twintext-codex",
@@ -11,9 +11,9 @@
     "com.openai": {
       "hooks": "./hooks/hooks.json",
       "interface": {
-        "displayName": "TwinText for Codex",
-        "shortDescription": "Read new replies in two languages, offline",
-        "longDescription": "Translate new Codex replies with local Argos models. Choose bilingual, translated-only, or original display, plus independent translation and interface languages.",
+        "displayName": "TwinText Desktop",
+        "shortDescription": "Read replies in a floating window, offline",
+        "longDescription": "Display completed Codex replies in a separate local floating window. Choose bilingual, translated-only, or original display, plus independent translation and interface languages.",
         "developerName": "LincolnGothic",
         "category": "Productivity",
         "capabilities": ["Read", "Write", "Interactive"],

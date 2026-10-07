@@ -58,6 +58,9 @@ def tools():
                 "ui_language": {"type": "string", "enum": ["auto", *LANGUAGES]},
                 "enabled": {"type": "boolean"},
                 "cache": {"type": "boolean"},
+                "host_locale": {"type": "string", "enum": ["auto", *LANGUAGES]},
+                "desktop_auto_start": {"type": "boolean"},
+                "always_on_top": {"type": "boolean"},
             },
             read_only=False,
         ),
@@ -69,6 +72,12 @@ def tools():
             ui=True,
         ),
         tool("twintext_clear_cache", "Clear the local translation cache.", {}, read_only=False),
+        tool(
+            "twintext_open_desktop",
+            "Open the local floating TwinText reader. Completed Codex replies are translated "
+            "in this window by the Stop hook, without returning translations to the model.",
+            {}, read_only=False,
+        ),
         tool(
             "twintext_install_models",
             "Download the eight official Argos models for the "
@@ -101,6 +110,10 @@ def call_tool(name, arguments, service):
             raise TwinTextError(f"Invalid {key}.")
     if name == "twintext_translate":
         return service.translate(**arguments)
+    if name == "twintext_open_desktop":
+        from twintext.bridge import launch_desktop
+
+        return launch_desktop()
     if name == "twintext_set_settings":
         update_settings(**arguments)
         return service.status()

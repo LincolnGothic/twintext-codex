@@ -110,28 +110,5 @@ class Service:
 
 
 def context():
-    settings = load_settings()
-    if not settings.enabled or settings.mode == "original":
-        return ""
-    target = LANGUAGES[settings.target]
-    presentation = (
-        "each prose paragraph followed by its translation"
-        if settings.mode == "bilingual"
-        else "only the translated prose"
-    )
-    return (
-        f"TwinText is enabled for this chat. Its target language is {target} "
-        f"({settings.target}) and its mode is {settings.mode}. "
-        "For new final replies, compose your normal complete reply, then pass that Markdown "
-        "to the local TwinText translate tool before sending the final answer. "
-        f"Present the returned display verbatim: {presentation}. "
-        "If TwinText MCP tools are unavailable, run the installed `twintext translate` CLI "
-        "with the reply passed on stdin (do not put reply text into shell arguments). "
-        "Keep short progress updates in the target language. "
-        "If source and target are the same, show the reply once. "
-        "Code, commands, paths and link targets must remain unchanged. "
-        "If the tool fails, show the original reply and briefly explain the translation failure; "
-        "do not substitute a cloud engine or claim the text was translated. "
-        "These preferences affect new replies and do not alter existing messages or Codex menus. "
-        "An explicit language or display request from the user takes precedence."
-    )
+    # Compatibility with v0.1 launchers; automatic translation now uses Stop + desktop.
+    return ""

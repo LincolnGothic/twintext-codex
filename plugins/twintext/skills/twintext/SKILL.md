@@ -1,17 +1,15 @@
 ---
 name: twintext
-description: Configure TwinText or translate Codex replies with local Argos models when the user asks for offline translation, bilingual replies, or TwinText settings.
+description: Open or configure TwinText Desktop, the offline floating translation companion for Codex on Linux.
 ---
 
-Use the local TwinText tools for offline translation and preferences.
+Use the local tools for opening the companion and changing its preferences.
 
-- Open settings with `twintext_settings_ui` when that tool is available. Otherwise launch the installed `twintext ui --open` CLI to show the local settings page.
-- Read current preferences with `twintext_status` before configuring a workflow. Translation language and plugin UI language are separate settings; `ui_language: auto` follows the host locale in the embedded UI and the browser locale on the standalone page.
-- For a new reply, compose the complete answer in the conversation's source language, call `twintext_translate` with its Markdown, then present the returned `display` verbatim. Settings choose bilingual, translated-only, or original mode. If both languages are the same, show the reply once.
-- If a user explicitly requests a different language or mode for a single reply, pass the corresponding tool arguments. Save preferences only when the user asks for a persistent change.
-- Keep code, commands, paths, links, and protected Markdown intact. TwinText preserves code blocks and conservative inline spans; tables and reference definitions are copied unchanged.
-- If the local model is unavailable, keep the original answer and explain the missing model. Model installation downloads official Argos assets and requires internet; translation after installation runs locally. Do not substitute a cloud service.
-- If the MCP tools are unavailable, use the installed `twintext translate` CLI. Pass content through a UTF-8 file or stdin with proper shell quoting; do not interpolate user text into executable shell code.
+- Open the floating reader with `twintext_open_desktop`. Open its settings panel with `twintext_settings_ui`. CLI fallbacks are `twintext desktop` and `twintext ui --open`.
+- Read `twintext_status` before changing persistent settings. Translation language, display mode, and interface language are independent. The desktop's automatic interface language follows the last host locale supplied by the embedded settings panel, falling back to the system locale.
+- Automatic translation happens outside this conversation: the trusted `Stop` hook forwards the completed reply to the local desktop inbox. The companion runs Argos and displays bilingual or translated-only text itself.
+- Do not call `twintext_translate` for ordinary replies, repeat the reply in a tool argument, or append its translation to the chat merely because TwinText is enabled. Those actions add model tokens and defeat the display-only workflow.
+- Use `twintext_translate` only when the user explicitly requests a translation result inside the conversation. That manual workflow adds normal tool/context/output tokens. Otherwise let the companion display translations.
+- Model installation downloads official Argos assets; run it only when requested. Inference is local. Do not substitute a cloud service.
 
-The plugin formats new replies through Codex instructions. It does not modify existing message rendering or Codex's native menu labels. Automatic application requires enabled and trusted bundled hooks; without hooks, the user can invoke this skill explicitly.
-
+The companion is a separate Linux window. It does not rewrite native chat messages, translate menus, or stream partial responses. Automatic capture requires the installed plugin's `Stop` hook to be enabled and trusted; paste works independently.

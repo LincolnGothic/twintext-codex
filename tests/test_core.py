@@ -49,7 +49,7 @@ class CoreTests(unittest.TestCase):
         update_settings(target="ja", ui_language="fr", mode="translated")
         self.assertEqual(load_settings().target, "ja")
         self.assertEqual(load_settings().ui_language, "fr")
-        self.assertIn("Japanese", context())
+        self.assertEqual(context(), "")
         update_settings(enabled=False)
         self.assertEqual(context(), "")
 

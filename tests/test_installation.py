@@ -53,7 +53,7 @@ class InstallationTests(unittest.TestCase):
             self.register()
         self.assertEqual(self.marketplace.read_text(), original)
 
-    def test_hook_emits_preferences_and_respects_disabled_setting(self):
+    def test_legacy_hook_never_injects_model_instructions(self):
         with patch.dict(
             os.environ, {"TWINTEXT_HOME": str(self.home), "TWINTEXT_PYTHON": sys.executable}
         ):
@@ -70,9 +70,7 @@ class InstallationTests(unittest.TestCase):
                 )
                 return json.loads(result.stdout)
 
-            result = invoke()["hookSpecificOutput"]
-            self.assertEqual(result["hookEventName"], "SessionStart")
-            self.assertIn("Japanese", result["additionalContext"])
+            self.assertEqual(invoke(), {})
             update_settings(enabled=False)
             self.assertEqual(invoke(), {})
 

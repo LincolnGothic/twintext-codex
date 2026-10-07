@@ -33,7 +33,7 @@ class ProtocolTests(unittest.TestCase):
     def test_initialize_and_ui_resource(self):
         result = self.request("initialize", {"protocolVersion": "2025-11-25"})["result"]
         self.assertEqual(result["protocolVersion"], "2025-11-25")
-        self.assertEqual(len(self.request("tools/list")["result"]["tools"]), 6)
+        self.assertEqual(len(self.request("tools/list")["result"]["tools"]), 7)
         resource = self.request("resources/read", {"uri": UI_URI})["result"]["contents"][0]
         self.assertIn("embedded: true", resource["text"])
         self.assertIn("ui/initialize", resource["text"])

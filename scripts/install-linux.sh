@@ -36,7 +36,7 @@ if [[ ! -x "$task_app/venv/bin/python" ]]; then
 fi
 # Argos depends on Stanza/PyTorch. Install CPU wheels first to avoid CUDA packages.
 "$task_app/venv/bin/python" -m pip install --no-input --index-url https://download.pytorch.org/whl/cpu torch
-"$task_app/venv/bin/python" -m pip install --no-input "$task_app/source[engine]"
+"$task_app/venv/bin/python" -m pip install --no-input "$task_app/source[engine,desktop]"
 task_binary="$HOME/.local/bin/twintext"
 if [[ -e "$task_binary" && ! -L "$task_binary" ]]; then
   printf 'Leaving existing %s untouched. Use %s instead.\n' "$task_binary" "$task_app/venv/bin/twintext"
@@ -47,10 +47,10 @@ fi
 mkdir -p "$task_app/plugin"
 cp -R "$task_repo/plugins/twintext/." "$task_app/plugin/"
 "$task_app/venv/bin/python" "$task_repo/scripts/register-plugin.py" "$task_app/plugin"
+"$task_app/venv/bin/python" "$task_repo/scripts/register-desktop.py" "$task_app"
 if $task_models; then
   "$task_app/venv/bin/twintext" models install --starter
 fi
-printf '\nTwinText installed. Open settings with:\n  %s ui --open\n' "$task_app/venv/bin/twintext"
+printf '\nTwinText Desktop installed. Open the floating reader with:\n  %s desktop\n' "$task_app/venv/bin/twintext"
 printf 'Restart Codex, select the TwinText Linux marketplace, and install/enable TwinText.\n'
-printf 'Review and trust its SessionStart and UserPromptSubmit hooks for automatic replies.\n'
-
+printf 'Review and trust its Stop hook to receive completed replies outside the conversation.\n'
