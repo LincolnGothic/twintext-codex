@@ -6,9 +6,10 @@ from dataclasses import replace
 from twintext.cache import Cache
 from twintext.config import LANGUAGES, TwinTextError, load_settings
 from twintext.engine import ArgosEngine, detect_language
-from twintext.markdown import blocks, prose, translate_block
+from twintext.markdown import blocks, prose, reference_ids, translate_block
 
 MAX_TEXT_LENGTH = 100_000
+QUANTITY_HEADER = {"en": "Quantity", "zh": "数量", "ja": "数量", "fr": "Quantité", "es": "Cantidad"}
 
 
 class Service:
@@ -62,9 +63,20 @@ class Service:
                 cache.put(key, value)
             return value
 
+        def translate_header(fragment):
+            # This very short field is ambiguous to the local model (e.g. it
+            # returned “termination reason” for English Quantity → Chinese).
+            # Apply the glossary only to table headers, never to ordinary prose.
+            if fragment.casefold() == QUANTITY_HEADER.get(source, "").casefold():
+                return QUANTITY_HEADER[settings.target]
+            return translate_fragment(fragment)
+
+        references = reference_ids(text)
         for block in blocks(text):
             value = (
-                translate_block(block.original, translate_fragment)
+                translate_block(
+                    block.original, translate_fragment, block.kind, references, translate_header
+                )
                 if needs_translation and block.translatable
                 else block.original
             )

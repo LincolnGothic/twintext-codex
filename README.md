@@ -2,7 +2,7 @@
 
 **An offline floating translation companion for Codex on Linux.** Read completed replies in two languages, or show only the translation. English, Chinese, Japanese, French, and Spanish are supported, with independent translation and interface language settings.
 
-![TwinText Desktop showing a French reply and its English translation](docs/desktop.png)
+![TwinText Desktop showing an English table and its Chinese translation](docs/tables.png)
 
 ## How it works
 
@@ -15,6 +15,8 @@ Private local inbox → Argos / CTranslate2 → floating TwinText reader
 Translations stay in the companion window. The automatic workflow does not ask Codex to call a translation tool, add translations to the conversation, or generate a bilingual final reply. It makes no additional LLM inference requests and adds no translation text to model context. Opening/configuring TwinText through chat, plugin instructions/tool definitions, or explicitly requesting an in-chat translation can still add ordinary Codex token usage. Offline translation itself has no API fee.
 
 This release displays **completed replies**, rather than streaming partial responses. It does not change native Codex message bubbles, translate menus, read other applications, or follow individual paragraphs on screen. The standalone reader also works with text you paste yourself, without Codex or hook approval.
+
+Desktop **0.2.2** translates Markdown table headers/cells, visible link labels, nested lists, checkboxes, headings and quotes. Bilingual tables show the original table followed by its translated table; translation-only shows one translated table. [Output-format coverage and limits](docs/output-formats.md).
 
 ## Install or upgrade on Linux
 
@@ -43,7 +45,7 @@ sudo apt install libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
 After installation or upgrade:
 
 1. Install/update and enable **TwinText Desktop** from your personal Codex marketplace. Its internal plugin name remains `twintext`. From the Codex CLI, use `codex plugin add twintext@twintext-linux`; substitute your existing personal marketplace name if different.
-2. Restart Codex and review/trust the plugin's **`Stop` hook**. Installation does not grant hook trust. Version 0.2 replaces the old `SessionStart` / `UserPromptSubmit` instruction hooks; start a new chat to discard old session instructions.
+2. Restart Codex and review/trust the plugin's **`Stop` hook** when installing it for the first time. Installation does not grant hook trust. Version 0.2 replaces the old `SessionStart` / `UserPromptSubmit` instruction hooks; start a new chat to discard old session instructions. Desktop 0.2.2 keeps the bridge plugin at 0.2.1: its hook command is unchanged, so an already trusted bridge needs no additional review. Restart TwinText to load the updated reader.
 3. Open **TwinText Desktop** from the application menu, or run `~/.local/bin/twintext desktop`.
 4. Choose translation language and bilingual/translation-only mode under **Settings**. The defaults are English and bilingual.
 
@@ -53,12 +55,14 @@ Without trusted hooks, the reader waits for replies; **Paste text** still works.
 
 ## Floating controls
 
-- **Collapse** reduces the reader to a compact `TT ↔` button. Drag its small handle to move it; click the button to expand. `TT ●` means a new reply arrived.
+![Collapsed TwinText control with a six-dot drag grip](docs/floating-button.png)
+
+- **Collapse** reduces the reader to a dark rounded **TwinText ↗** control with a visible six-dot grip. Drag the grip or drag the button to move it; click the button to expand. A dot means a new reply arrived. The grip has a move cursor and a localized tooltip.
 - The reader's header can be dragged. Resize with its bottom-right grip. **Keep above other windows** requests always-on-top behavior from the desktop.
 - The session selector holds the latest reply from up to 24 chats. A newly completed reply becomes the displayed reply. Old turns are not imported.
 - **Receive Codex replies** pauses/resumes capture. **Open floating button on new replies** controls whether the hook starts a closed companion automatically. Uncheck this and launch the app yourself if preferred.
 - **Paste text** reads the clipboard only when clicked. You can edit the text before pressing **Translate**; there is no clipboard monitor.
-- **Copy displayed text** preserves Markdown. **Clear received replies** removes the local inbox contents. **Quit** stops the companion; disable auto-start too if you want it to remain closed on subsequent replies.
+- **Copy displayed text** preserves Markdown. **Clear received replies** removes the local inbox contents. **Settings → Clear cache** removes stored translations independently. **Quit** stops the companion; disable auto-start too if you want it to remain closed on subsequent replies.
 
 On GNOME/Wayland, the compositor controls global placement and may ignore always-on-top hints. This version uses a movable companion, not an overlay that tracks the Codex window. If native Wayland ignores pinning and XWayland is available, launch with `QT_QPA_PLATFORM=xcb twintext desktop`. X11 desktop support depends on its window manager too.
 
@@ -94,9 +98,10 @@ MCP tools include `twintext_open_desktop`, `twintext_settings_ui`, `twintext_sta
 ## Local data and preservation
 
 - Inference uses installed Argos tokenizers and CPU CTranslate2. There are no inference-time downloads or cloud translation calls. One background worker keeps the UI responsive and ignores stale results when a newer reply or language selection arrives.
-- Code fences, indented code, inline code, URLs, Markdown links, and recognized file paths remain intact. Tables, link-reference definitions, and display math are conservatively left untranslated. Protected blocks appear once in bilingual mode.
+- Code fences, actual indented code, inline code, URLs, reference identifiers, link destinations and recognized file paths remain intact. Table text and visible link labels translate while column separators, alignment and numbers stay intact. Reference definitions, raw HTML blocks, app directives and display math remain unchanged. Protected blocks appear once in bilingual mode.
 - Settings live in `~/.config/twintext/settings.json`; models, translation cache, and desktop data live under `~/.local/share/twintext`, respecting XDG directories. `TWINTEXT_HOME` isolates these for tests.
 - The private desktop inbox stores original reply text locally, even if translation caching is disabled. It is bounded to the latest reply from 24 sessions and can be cleared independently. The translator cache can be disabled or cleared from settings.
+- **Retention:** the translation cache is `~/.local/share/twintext/translations.sqlite3`, limited to 10,000 fragments with oldest-used entries evicted as needed. There is no timed expiry. Turning off **Remember translations locally** stops new reads/writes but leaves existing entries; **Clear cache** deletes those entries. The separate inbox is `~/.local/share/twintext/desktop/inbox.sqlite3` and has no timed expiry either: new replies replace the previous reply for that chat, and older sessions are removed above 24. Clearing either store normally completes immediately; SQLite files may remain after their records are cleared. XDG directory overrides and `TWINTEXT_HOME` change these locations.
 - The bridge uses a local SQLite inbox and file lock, with no network listener. The hook fails open, returns `{}`, and never requests another Codex turn. Multiple app launches activate the existing reader.
 - Rendered replies do not fetch Markdown images or open links automatically. There is no telemetry or log of reply text.
 
@@ -111,6 +116,7 @@ python3.12 -m venv .venv
 node --check src/twintext/web/app.js
 bash -n scripts/install-linux.sh
 python scripts/check-codex-plugin.py --codex /path/to/codex
+.venv/bin/python scripts/smoke-formats.py /tmp/twintext-formats
 ```
 
 The desktop tests use Qt's offscreen platform and an injected translator. They verify the hook contract, bounded/concurrent capture, stale-result handling, display modes, all interface languages, and unchanged original replies. For a real-model desktop smoke check, first install the starter models, then run:

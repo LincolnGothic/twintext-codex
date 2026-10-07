@@ -74,19 +74,22 @@ class CoreTests(unittest.TestCase):
         result = self.service.translate(text)
         self.assertIn("# 译:Hello", result["display"])
         self.assertEqual(result["display"].count("print('hello')"), 1)
-        for token in ("`npm test`", "/tmp/app.py", "[docs](https://example.com)", "x = y + 1"):
+        for token in ("`npm test`", "/tmp/app.py", "https://example.com", "x = y + 1"):
             self.assertIn(token, result["translation"])
             self.assertTrue(all(token not in call for call in self.engine.calls))
+        self.assertIn("[译:docs](https://example.com)", result["translation"])
 
     def test_tilde_and_unclosed_fences_stay_verbatim(self):
         for text in ("~~~js\nconst a = 1;\n~~~\n", "```python\nprint('a')"):
             self.assertEqual(self.service.translate(text)["display"], text)
         self.assertFalse(blocks("````\n```\ncode\n````\n")[0].translatable)
 
-    def test_tables_references_and_indented_code_are_preserved(self):
+    def test_table_headers_translate_but_references_and_indented_code_stay_exact(self):
         text = "| A | B |\n|---|---|\n\n[docs]: https://example.com\n\n    print('a')\n"
-        self.assertEqual(self.service.translate(text)["display"], text)
-        self.assertFalse(self.engine.calls)
+        result = self.service.translate(text)
+        self.assertIn("| 译:A | 译:B |\n|---|---|", result["translation"])
+        self.assertIn("[docs]: https://example.com\n\n    print('a')\n", result["translation"])
+        self.assertEqual(self.engine.calls, ["A", "B"])
 
     def test_nested_inline_code_quoted_fence_and_unprefixed_table_are_preserved(self):
         text = (
@@ -95,7 +98,7 @@ class CoreTests(unittest.TestCase):
         )
         result = self.service.translate(text)
         self.assertIn("``printf `hello` ``", result["translation"])
-        self.assertIn("Name | Value\n--- | ---\none | two", result["translation"])
+        self.assertIn("译:Name | 译:Value\n--- | ---\n译:one | 译:two", result["translation"])
         self.assertEqual(result["display"].count("> npm test"), 1)
         self.assertTrue(
             all("printf" not in call and "npm" not in call for call in self.engine.calls)
@@ -127,6 +130,25 @@ class CoreTests(unittest.TestCase):
         self.service.translate("Hello")
         self.assertEqual(len(self.engine.calls), 2)
         self.assertFalse(Path(self.directory.name, "translations.sqlite3").exists())
+
+    def test_cache_is_bounded_and_disabling_preserves_existing_entries(self):
+        cache = Cache()
+        with cache.connect() as connection:
+            connection.executemany(
+                "INSERT INTO translations VALUES (?, ?, ?)",
+                [(f"old-{i}", "old translation", 0) for i in range(10000)],
+            )
+        cache.put("new", "new translation")
+        with cache.connect() as connection:
+            self.assertEqual(
+                connection.execute("SELECT COUNT(*) FROM translations").fetchone()[0], 10000
+            )
+            self.assertIsNone(
+                connection.execute("SELECT value FROM translations WHERE key='old-0'").fetchone()
+            )
+        update_settings(cache=False)
+        self.service.translate("Hello")
+        self.assertEqual(cache.get("new"), "new translation")
 
     def test_long_input_and_invalid_mode_fail(self):
         for kwargs in ({"text": "a" * 100001}, {"text": "Hello", "mode": "wrong"}, {"text": 123}):

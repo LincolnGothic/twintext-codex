@@ -6,12 +6,16 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt  # noqa: E402
+from PySide6.QtGui import QMouseEvent  # noqa: E402
+from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 from test_bridge import payload  # noqa: E402
 from test_core import FakeEngine  # noqa: E402
+from test_markdown_formats import TABLE  # noqa: E402
 
 from twintext.bridge import Inbox  # noqa: E402
+from twintext.cache import Cache  # noqa: E402
 from twintext.config import LANGUAGES, load_settings, update_settings  # noqa: E402
 from twintext.desktop import WORDS, Companion  # noqa: E402
 from twintext.service import Service  # noqa: E402
@@ -130,6 +134,72 @@ class DesktopTests(unittest.TestCase):
         self.assertFalse(self.window.orb.isVisible())
         self.assertTrue(self.window.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
         self.assertIsNone(self.window.reader.loadResource(2, "https://example.com/image.png"))
+
+    def test_table_renders_and_copy_modes_preserve_rows_and_numbers(self):
+        self.inbox.publish(payload(text=TABLE))
+        self.window.poll()
+        self.deliver_result()
+        plain = self.window.reader.toPlainText()
+        self.assertIn("译:Fresh red apples", plain)
+        self.assertIn("Fresh red apples", plain)
+        self.assertEqual(plain.count("Whole wheat loaf"), 2)
+        self.window.copy()
+        self.assertIn("| 译:Apples | 译:Fresh red apples | 5 |", self.app.clipboard().text())
+        self.window.selects["mode"].setCurrentIndex(1)
+        self.assertEqual(self.window.reader.toPlainText().count("Whole wheat loaf"), 1)
+        self.window.selects["mode"].setCurrentIndex(2)
+        self.assertNotIn("译:", self.window.reader.toPlainText())
+        self.assertEqual(self.inbox.replies()[0]["text"], TABLE)
+
+    def test_clear_cache_does_not_clear_inbox_or_preferences(self):
+        self.inbox.publish(payload(text="Hello"))
+        self.service.translate("Hello")
+        cache = Cache()
+        with cache.connect() as con:
+            self.assertEqual(con.execute("select count(*) from translations").fetchone()[0], 1)
+        saved = load_settings()
+        self.window.cache_button.click()
+        with cache.connect() as con:
+            self.assertEqual(con.execute("select count(*) from translations").fetchone()[0], 0)
+        self.assertEqual(self.inbox.replies()[0]["text"], "Hello")
+        self.assertEqual(load_settings(), saved)
+        self.assertIn("cleared", self.window.status.text())
+
+    def test_orb_handle_starts_move_and_click_opens_without_dragging(self):
+        self.window.collapse()
+        self.app.processEvents()
+        self.assertGreaterEqual(self.window.orb_handle.width(), 30)
+        self.assertEqual(self.window.orb_handle.toolTip(), "Drag to move")
+        with patch("twintext.desktop.start_window_move") as move:
+            QTest.mouseClick(self.window.orb_handle, Qt.MouseButton.LeftButton)
+            move.assert_called_once_with(self.window.orb_handle)
+            self.assertTrue(self.window.orb.isVisible())
+            QTest.mouseClick(self.window.orb_button, Qt.MouseButton.LeftButton)
+            self.assertTrue(self.window.isVisible())
+            self.assertFalse(self.window.orb.isVisible())
+            self.assertEqual(move.call_count, 1)
+
+    def test_dragging_expand_button_does_not_open_reader(self):
+        self.window.collapse()
+        self.app.processEvents()
+        button = self.window.orb_button
+        pos = button.rect().center()
+        QTest.mousePress(button, Qt.MouseButton.LeftButton, pos=pos)
+        moved = pos + QPoint(QApplication.startDragDistance() + 10, 0)
+        event = QMouseEvent(
+            QEvent.Type.MouseMove,
+            QPointF(moved),
+            QPointF(button.mapToGlobal(moved)),
+            Qt.MouseButton.NoButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        with patch("twintext.desktop.start_window_move") as move:
+            QApplication.sendEvent(button, event)
+            move.assert_called_once_with(button)
+        QTest.mouseRelease(button, Qt.MouseButton.LeftButton, pos=moved)
+        self.assertFalse(self.window.isVisible())
+        self.assertTrue(self.window.orb.isVisible())
 
 
 if __name__ == "__main__":

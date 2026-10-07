@@ -1,91 +1,107 @@
-"""Conservative Markdown translation: protected source never enters the model.
+"""Translate visible Markdown without rewriting code or structural source.
 
-This is intentionally not a complete Markdown parser. Tables, reference-link
-definitions, fenced and indented code, and display math remain verbatim.
+CommonMark block maps distinguish nested lists from actual code. Tables are
+translated cell by cell; link destinations, code, HTML blocks and math are opaque.
 """
 
 import re
 from dataclasses import dataclass
 
-FENCE = re.compile(r"^(?: {0,3}> ?)* {0,3}(`{3,}|~{3,})")
-PREFIX = re.compile(r"^(\s*(?:(?:>\s*)+)?(?:#{1,6}\s+|[-+*]\s+|\d+[.)]\s+)?)(.*)$")
+from markdown_it import MarkdownIt
+
+PREFIX = re.compile(
+    r"^(\s*(?:(?:>\s*)+)?"
+    r"(?:#{1,6}\s+|(?:[-+*]|\d+[.)])\s+(?:\[[ xX]\]\s+)?|\[\^[^\]]+\]:\s*)?)(.*)$"
+)
 PROTECTED = re.compile(
-    r"(?<!`)(`+)(?!`)[^\n]*?(?<!`)\1(?!`)|!?\[[^\]\n]*\]\([^\n]*?\)|"
-    r"!?\[[^\]\n]*\]\[[^\]\n]*\]|"
-    r"https?://[^\s<>]+|<[^>\n]+>|"
+    r"(?<!`)(`+)(?!`)[^\n]*?(?<!`)\1(?!`)|"
+    r"[a-zA-Z][\w+.-]*://[^\s<>]+|<[^>\n]+>|"
+    r"[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}|"
     r"(?<!\w)(?:/|~/|\./|\.\./)[\w./@%+~:=-]+|"
-    r"\$[^$\n]+\$|\\\([^\n]*?\\\)|"
+    r"(?<!\w)[A-Za-z]:\\[\w.\\/@%+~:=-]+|"
+    r"\$(?!\d+(?:[.,]\d+)*(?:\s|$))[^$\n]+\$(?!\d)|\\\([^\n]*?\\\)|"
+    r"[$€£¥]\d[\d,.]*(?!\w)|"
+    r':{1,2}codex-[\w-]+\{(?:"(?:\\.|[^"\\])*"|[^{}\n"])*\}|'
+    r"\[\^[^\]\n]+\]|\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]|"
+    r"\\[!\"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~]|&(?:\w+|#\d+|#x[\da-fA-F]+);|"
     r"\*\*|__|~~|(?<!\w)[*_]|[*_](?!\w)"
 )
+REFERENCE = re.compile(r"^ {0,3}\[([^\]^][^\]]*)\]:", re.MULTILINE)
+SYNTAX_LINE = re.compile(r"^(?:[-*_]\s*){3,}$|^=+\s*$|^-+\s*$")
 
 
 @dataclass
 class Block:
     original: str
     translatable: bool
+    kind: str = "prose"
 
 
 def blocks(text: str):
-    output = []
-    buffer = []
-    fence = None
-    math = False
-    table = False
-
-    def flush():
-        if buffer:
-            output.append(Block("".join(buffer), True))
-            buffer.clear()
-
     lines = text.splitlines(keepends=True)
+    kinds = ["opaque"] * len(lines)
+    tokens = MarkdownIt("commonmark").enable("table").parse(text)
+    for token in tokens:
+        if token.type in ("inline", "heading_open") and token.map:
+            start, end = token.map
+            kinds[start:end] = ["prose"] * (end - start)
+    for token in tokens:
+        if token.type in ("fence", "code_block", "html_block", "table_open") and token.map:
+            start, end = token.map
+            kind = "table" if token.type == "table_open" else "opaque"
+            kinds[start:end] = [kind] * (end - start)
+    math_end = None
     for index, line in enumerate(lines):
-        match = FENCE.match(line)
-        if fence:
+        raw = re.sub(r"^\s*(?:>\s*)*", "", line).strip()
+        if math_end:
+            kinds[index] = "opaque"
+            if raw == math_end:
+                math_end = None
+            continue
+        if kinds[index] == "opaque":
+            if re.match(r"^\[\^[^\]]+\]:\s+", raw):
+                kinds[index] = "prose"
+            else:
+                continue
+        if raw in ("$$", "\\["):
+            kinds[index] = "opaque"
+            math_end = "$$" if raw == "$$" else "\\]"
+        elif (raw.startswith("$$") and raw.endswith("$$")) or (
+            raw.startswith("\\[") and raw.endswith("\\]")
+        ):
+            kinds[index] = "opaque"
+        elif re.match(r":{1,2}codex-[\w-]+\{", raw):
+            kinds[index] = "opaque"
+        elif not raw:
+            kinds[index] = "opaque"
+    output = []
+    for index, line in enumerate(lines):
+        kind = kinds[index]
+        if output and output[-1].kind == kind:
             output[-1].original += line
-            if (
-                match
-                and match[1][0] == fence[0]
-                and len(match[1]) >= len(fence)
-                and not line[match.end() :].strip()
-            ):
-                fence = None
-            continue
-        if match:
-            flush()
-            output.append(Block(line, False))
-            fence = match[1]
-            continue
-        if line.strip() in ("$$", "\\[", "\\]"):
-            flush()
-            output.append(Block(line, False))
-            math = not math
-            continue
-        # CommonMark permits tables without a leading pipe. Detect their separator.
-        next_line = lines[index + 1].strip() if index + 1 < len(lines) else ""
-        if "|" in line and re.fullmatch(r"\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?", next_line):
-            table = True
-        if not line.strip() or "|" not in line:
-            table = False
-        opaque = (
-            table
-            or math
-            or line.startswith(("    ", "\t"))
-            or bool(re.match(r"^\s*\[[^\]]+\]:|^\s*\|", line))
-            or bool(re.match(r"^\s*(?:[-*_]\s*){3,}$", line))
-        )
-        if not line.strip() or opaque:
-            flush()
-            output.append(Block(line, False))
         else:
-            buffer.append(line)
-    flush()
+            output.append(Block(line, kind != "opaque", kind))
     return output
 
 
+def normalize_id(text):
+    return " ".join(text.split()).casefold()
+
+
+def reference_ids(text):
+    return {normalize_id(match[1]) for match in REFERENCE.finditer(text)}
+
+
 def prose(text: str):
-    return " ".join(
-        PROTECTED.sub(" ", block.original) for block in blocks(text) if block.translatable
-    )
+    # Detection sees the same visible text as translation, including table headers.
+    visible = []
+    references = reference_ids(text)
+    for block in blocks(text):
+        if block.translatable:
+            translate_block(
+                block.original, lambda value: visible.append(value) or value, block.kind, references
+            )
+    return " ".join(visible)
 
 
 def translate_span(text: str, translate):
@@ -96,19 +112,153 @@ def translate_span(text: str, translate):
     return start + translate(text.strip()) + end
 
 
-def translate_block(text: str, translate):
+def closing(text, start, left, right):
+    """Match nested brackets/parentheses, respecting Markdown escapes."""
+    depth = 0
+    index = start
+    while index < len(text):
+        if text[index] == "\\":
+            index += 2
+            continue
+        if left == "[" and text[index] == "`":
+            code = PROTECTED.match(text, index)
+            if code:
+                index = code.end()
+                continue
+        if left == "(" and text[index] in "\"'" and index > start and text[index - 1].isspace():
+            quote = text[index]
+            index += 1
+            while index < len(text) and text[index] != quote:
+                index += 2 if text[index] == "\\" else 1
+            index += 1
+            continue
+        if left == "(" and text[index] == "<" and ">" in text[index:]:
+            index = text.index(">", index) + 1
+            continue
+        if text[index] == left:
+            depth += 1
+        elif text[index] == right:
+            depth -= 1
+            if not depth:
+                return index
+        index += 1
+    return None
+
+
+def translate_inline(body, translate, references=(), depth=0):
+    result = []
+    index = start = 0
+    while index < len(body):
+        protected = PROTECTED.match(body, index)
+        label_start = index + 1 if body.startswith("![", index) else index
+        end = replacement = None
+        if not protected and depth < 16 and body[label_start : label_start + 1] == "[":
+            label_end = closing(body, label_start, "[", "]")
+            if label_end is not None:
+                label = body[label_start + 1 : label_end]
+                after = label_end + 1
+                if body[after : after + 1] == "(":
+                    destination_end = closing(body, after, "(", ")")
+                    if destination_end is not None:
+                        end = destination_end + 1
+                elif body[after : after + 1] == "[":
+                    reference_end = closing(body, after, "[", "]")
+                    if reference_end is not None:
+                        end = reference_end + 1
+                elif normalize_id(label) in references:
+                    end = after
+                if end:
+                    translated = translate_inline(label, translate, references, depth + 1)
+                    suffix = body[after:end]
+                    if suffix in ("", "[]"):
+                        suffix = "[" + label + "]"
+                    replacement = body[index : label_start + 1] + translated + "]" + suffix
+        if protected:
+            end, replacement = protected.end(), protected[0]
+        if end:
+            result.append(translate_span(body[start:index], translate))
+            result.append(replacement)
+            index = start = end
+        else:
+            index += 1
+    result.append(translate_span(body[start:], translate))
+    return "".join(result)
+
+
+def row_parts(raw):
+    """Keep table delimiters, including escaped pipes and code-span pipes."""
+    parts = []
+    start = index = 0
+    code = None
+    while index < len(raw):
+        if raw[index] == "\\":
+            index += 2
+            continue
+        if raw[index] == "`":
+            end = index + 1
+            while end < len(raw) and raw[end] == "`":
+                end += 1
+            marker = raw[index:end]
+            if code == marker:
+                code = None
+            elif code is None and re.search(r"(?<!`)" + re.escape(marker) + r"(?!`)", raw[end:]):
+                code = marker
+            index = end
+            continue
+        if raw[index] == "|" and not code:
+            parts.extend((raw[start:index], "|"))
+            start = index + 1
+        index += 1
+    parts.append(raw[start:])
+    return parts
+
+
+def translate_table(text, translate, references, translate_header=None):
+    output = []
+
+    def safe_cell(fragment):
+        # Model-created pipes/newlines must not create extra columns or rows.
+        value = cell_translator(fragment)
+        return value.replace("|", r"\|").replace("\r", " ").replace("\n", " ")
+
+    for row, line in enumerate(text.splitlines(keepends=True)):
+        cell_translator = translate_header if row == 0 and translate_header else translate
+        raw = line.rstrip("\r\n")
+        newline = line[len(raw) :]
+        prefix = re.match(r"^(\s*(?:>\s*)*)", raw)[0]
+        parts = row_parts(raw[len(prefix) :])
+        cells = [value.strip() for value in parts[::2] if value.strip()]
+        if cells and all(re.fullmatch(r":?-+:?", cell) for cell in cells):
+            output.append(line)
+        else:
+            output.append(
+                prefix
+                + "".join(
+                    translate_inline(value, safe_cell, references) if i % 2 == 0 else value
+                    for i, value in enumerate(parts)
+                )
+                + newline
+            )
+    return "".join(output)
+
+
+def translate_block(text: str, translate, kind="prose", references=None, translate_header=None):
+    references = reference_ids(text) if references is None else references
+    if kind == "table":
+        return translate_table(text, translate, references, translate_header)
     output = []
     for line in text.splitlines(keepends=True):
-        newline = "\n" if line.endswith("\n") else ""
-        raw = line[:-1] if newline else line
+        raw = line.rstrip("\r\n")
+        newline = line[len(raw) :]
         match = PREFIX.match(raw)
         prefix, body = match[1], match[2]
-        cursor = 0
-        result = [prefix]
-        for token in PROTECTED.finditer(body):
-            result.append(translate_span(body[cursor : token.start()], translate))
-            result.append(token[0])
-            cursor = token.end()
-        result.append(translate_span(body[cursor:], translate))
-        output.append("".join(result) + newline)
+        if SYNTAX_LINE.fullmatch(body.strip()):
+            output.append(line)
+            continue
+        suffix = re.search(r"\s+#+\s*$", body) if re.match(r"\s*(?:>\s*)*#{1,6} ", raw) else None
+        if suffix:
+            body, ending = body[: suffix.start()], body[suffix.start() :]
+        else:
+            ending = ""
+        output.append(prefix + translate_inline(body, translate, references) + ending + newline)
     return "".join(output)

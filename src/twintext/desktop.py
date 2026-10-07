@@ -5,7 +5,7 @@ import sqlite3
 import threading
 
 from PySide6.QtCore import QLocale, Qt, QTimer
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -23,11 +23,21 @@ from PySide6.QtWidgets import (
 )
 
 from twintext.bridge import Inbox, desktop_lock
+from twintext.cache import Cache
 from twintext.config import LANGUAGES, MODES, TwinTextError, load_settings, update_settings
 from twintext.service import Service
 
 WORDS = {
     "en": {
+        "drag": "Drag to move",
+        "expand": "Open TwinText",
+        "clear_cache": "Clear cache",
+        "cache_cleared": "Translation cache cleared",
+        "cache_hint": (
+            "Reuses up to 10,000 translated fragments; no timed expiry. Turnin"
+            "g this off keeps existing entries. Clear cache deletes them."
+        ),
+        "inbox_hint": "Deletes received replies, separately from the translation cache.",
         "offline": "Offline · on your computer",
         "settings": "Settings",
         "collapse": "Collapse",
@@ -67,6 +77,14 @@ WORDS = {
         "es": "Spanish",
     },
     "zh": {
+        "drag": "拖动以移动",
+        "expand": "打开 TwinText",
+        "clear_cache": "清除缓存",
+        "cache_cleared": "翻译缓存已清除",
+        "cache_hint": (
+            "最多保存 10,000 条翻译片段，无定时过期。关闭后保留已有记录；“清除缓存”会删除它们。"
+        ),
+        "inbox_hint": "删除接收到的回复，不清除翻译缓存。",
         "offline": "离线 · 在本机运行",
         "settings": "设置",
         "collapse": "收起",
@@ -104,6 +122,15 @@ WORDS = {
         "es": "西班牙语",
     },
     "ja": {
+        "drag": "ドラッグして移動",
+        "expand": "TwinText を開く",
+        "clear_cache": "キャッシュを消去",
+        "cache_cleared": "翻訳キャッシュを消去しました",
+        "cache_hint": (
+            "翻訳の断片を最大10,000件保存します。期限はありません。"
+            "無効にしても既存の記録は残ります。消去ボタンで削除できます。"
+        ),
+        "inbox_hint": "受信した返信を削除します。翻訳キャッシュは残ります。",
         "offline": "オフライン · このコンピューターで実行",
         "settings": "設定",
         "collapse": "折りたたむ",
@@ -141,6 +168,15 @@ WORDS = {
         "es": "スペイン語",
     },
     "fr": {
+        "drag": "Glisser pour déplacer",
+        "expand": "Ouvrir TwinText",
+        "clear_cache": "Vider le cache",
+        "cache_cleared": "Cache de traduction vidé",
+        "cache_hint": (
+            "Réutilise jusqu’à 10 000 fragments, sans expiration. Désactiver c"
+            "onserve les entrées existantes. Vider le cache les supprime."
+        ),
+        "inbox_hint": "Supprime les réponses reçues, séparément du cache de traduction.",
         "offline": "Hors ligne · sur votre ordinateur",
         "settings": "Paramètres",
         "collapse": "Réduire",
@@ -182,6 +218,15 @@ WORDS = {
         "es": "Espagnol",
     },
     "es": {
+        "drag": "Arrastrar para mover",
+        "expand": "Abrir TwinText",
+        "clear_cache": "Vaciar caché",
+        "cache_cleared": "Caché de traducción vaciada",
+        "cache_hint": (
+            "Reutiliza hasta 10 000 fragmentos, sin caducidad. Desactivar cons"
+            "erva las entradas existentes. Vaciar caché las elimina."
+        ),
+        "inbox_hint": "Elimina las respuestas recibidas, por separado de la caché de traducción.",
         "offline": "Sin conexión · en tu ordenador",
         "settings": "Ajustes",
         "collapse": "Contraer",
@@ -268,10 +313,57 @@ class Reader(QTextBrowser):
         return None
 
 
+def start_window_move(widget):
+    handle = widget.window().windowHandle()
+    return handle.startSystemMove() if handle else False
+
+
 class Header(QWidget):
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton and self.window().windowHandle():
-            self.window().windowHandle().startSystemMove()
+        if event.button() == Qt.MouseButton.LeftButton:
+            start_window_move(self)
+
+
+class DragHandle(Header):
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(30, 36)
+        self.setCursor(Qt.CursorShape.SizeAllCursor)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#9ec8b9"))
+        for x in (11, 18):
+            for y in (11, 18, 25):
+                painter.drawEllipse(x - 2, y - 2, 4, 4)
+
+
+class ExpandButton(QPushButton):
+    """Click opens the reader; a deliberate drag moves the floating control."""
+
+    def mousePressEvent(self, event):
+        self.drag_origin = event.globalPosition().toPoint()
+        self.dragged = False
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.MouseButton.LeftButton and hasattr(self, "drag_origin"):
+            distance = (event.globalPosition().toPoint() - self.drag_origin).manhattanLength()
+            if not self.dragged and distance >= QApplication.startDragDistance():
+                self.dragged = True
+                self.setDown(False)
+                start_window_move(self)
+        if not getattr(self, "dragged", False):
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if getattr(self, "dragged", False):
+            self.setDown(False)
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
 
 
 class Companion(QWidget):
@@ -334,6 +426,8 @@ class Companion(QWidget):
         self.locale_hint.setWordWrap(True)
         self.locale_hint.setObjectName("muted")
         form.addRow(self.locale_hint)
+        self.cache_button = QPushButton()
+        form.addRow(self.cache_button)
         self.preferences.hide()
         layout.addWidget(self.preferences)
         self.reader = Reader()
@@ -372,17 +466,23 @@ class Companion(QWidget):
         self.orb = QWidget(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         self.orb.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.orb.setWindowTitle("TwinText")
+        self.orb.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         orb_layout = QHBoxLayout(self.orb)
-        orb_layout.setContentsMargins(6, 6, 6, 6)
-        handle = Header()
-        handle.setFixedWidth(16)
-        handle.setToolTip("Drag")
-        orb_layout.addWidget(handle)
-        self.orb_button = QPushButton("TT ↔")
-        self.orb_button.setMinimumSize(80, 36)
+        orb_layout.setContentsMargins(0, 0, 0, 0)
+        panel = QFrame()
+        panel.setObjectName("orbPanel")
+        panel_layout = QHBoxLayout(panel)
+        panel_layout.setContentsMargins(5, 5, 8, 5)
+        panel_layout.setSpacing(0)
+        self.orb_handle = DragHandle()
+        panel_layout.addWidget(self.orb_handle)
+        self.orb_button = ExpandButton("TwinText  ↗")
+        self.orb_button.setObjectName("orbExpand")
+        self.orb_button.setMinimumSize(116, 36)
         self.orb_button.clicked.connect(self.expand)
-        orb_layout.addWidget(self.orb_button)
-        self.orb.resize(120, 52)
+        panel_layout.addWidget(self.orb_button)
+        orb_layout.addWidget(panel)
+        self.orb.setFixedSize(164, 48)
         self.setStyleSheet(STYLE)
         self.orb.setStyleSheet(STYLE)
         self.localize()
@@ -391,6 +491,7 @@ class Companion(QWidget):
             lambda: self.preferences.setVisible(not self.preferences.isVisible())
         )
         self.collapse_button.clicked.connect(self.collapse)
+        self.cache_button.clicked.connect(self.clear_cache)
         self.paste_button.clicked.connect(self.paste)
         self.translate_button.clicked.connect(self.translate_manual)
         self.copy_button.clicked.connect(self.copy)
@@ -421,6 +522,7 @@ class Companion(QWidget):
             (self.translate_button, "translate"),
             (self.copy_button, "copy"),
             (self.clear_button, "clear"),
+            (self.cache_button, "clear_cache"),
             (self.quit_button, "quit"),
         ):
             button.setText(self.t(key))
@@ -428,6 +530,12 @@ class Companion(QWidget):
         self.locale_hint.setText(self.t("locale_hint"))
         self.editor.setPlaceholderText(self.t("placeholder"))
         self.collapse_button.setToolTip(self.t("collapse"))
+        self.orb_handle.setToolTip(self.t("drag"))
+        self.orb_handle.setAccessibleName(self.t("drag"))
+        self.orb_button.setToolTip(self.t("expand"))
+        self.orb_button.setAccessibleName(self.t("expand"))
+        self.checks["cache"].setToolTip(self.t("cache_hint"))
+        self.clear_button.setToolTip(self.t("inbox_hint"))
         for key, combo in self.selects.items():
             combo.blockSignals(True)
             combo.clear()
@@ -501,11 +609,18 @@ class Companion(QWidget):
         self.show()
         self.raise_()
         self.activateWindow()
-        self.orb_button.setText("TT ↔")
+        self.orb_button.setText("TwinText  ↗")
 
     def collapse(self):
         self.hide()
         self.orb.show()
+
+    def clear_cache(self):
+        try:
+            Cache().clear()
+            self.status.setText(self.t("cache_cleared"))
+        except (OSError, sqlite3.Error) as exc:
+            self.status.setText(str(exc))
 
     def closeEvent(self, event):
         event.ignore()
@@ -589,7 +704,7 @@ class Companion(QWidget):
                 if rows:
                     self.select_reply(0)
                     if self.orb.isVisible():
-                        self.orb_button.setText("TT ●")
+                        self.orb_button.setText("TwinText  ●")
                 else:
                     self.text = ""
                     self.translate_current()
@@ -625,6 +740,11 @@ border-radius: 7px; padding: 6px; }
 QTextBrowser#reader { background: white; border: 1px solid #d2e1d8; border-radius: 12px;
 padding: 14px; font-size: 14px; }
 QFrame#preferences { background: #edf4ef; border-radius: 9px; }
+QFrame#orbPanel { background: #173f35; border: 1px solid #396757; border-radius: 23px; }
+QFrame#orbPanel QWidget { background: transparent; }
+QPushButton#orbExpand { background: transparent; color: #f0fff8; border: none;
+border-radius: 18px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
+QPushButton#orbExpand:hover { background: #285647; }
 QCheckBox { padding: 2px; }
 """
 
@@ -641,8 +761,6 @@ def run(background=False):
     app.setQuitOnLastWindowClosed(False)
     icon = QPixmap(64, 64)
     icon.fill(Qt.GlobalColor.transparent)
-    from PySide6.QtGui import QColor, QPainter
-
     painter = QPainter(icon)
     painter.fillRect(icon.rect(), QColor("#196d5d"))
     painter.setPen(Qt.GlobalColor.white)

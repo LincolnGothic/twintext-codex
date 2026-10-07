@@ -1,0 +1,33 @@
+{
+  "directions": [
+    {
+      "target": "zh",
+      "seconds": 1.72,
+      "table_rows_preserved": true,
+      "translation": "## 购物列表\n\n| 项目 | 说明 | 数量 |\n| :--- | --- | ---: |\n| 苹果 | 新鲜的红苹果 | 5 |\n| 面包 | 全麦卷 | 2 |\n| 牛奶 | 单升瓶 | 1 |\n\n- [ ] 阅读 [安装指南](https://example.com/guide).\n    - 将文件保存到 `/tmp/example.py`.\n\n> **说明:** 请检查数量。\n\n```sh\nprintf 'hello'\n```\n"
+    },
+    {
+      "target": "ja",
+      "seconds": 1.51,
+      "table_rows_preserved": true,
+      "translation": "## ショッピングリスト\n\n| アイテム | コンテンツ | 数量 |\n| :--- | --- | ---: |\n| アップル | 新鮮な赤いリンゴ | 5 |\n| ログイン | 全小麦ローフ | 2 |\n| ミルク | 1リットルボトル | 1 |\n\n- [ ] 読む [インストールガイド](https://example.com/guide).\n    - ファイルの保存 `/tmp/example.py`.\n\n> **注意:** 数量をご確認ください。\n\n```sh\nprintf 'hello'\n```\n"
+    },
+    {
+      "target": "fr",
+      "seconds": 1.69,
+      "table_rows_preserved": true,
+      "translation": "## Liste des achats\n\n| Objet | Désignation des marchandises | Quantité |\n| :--- | --- | ---: |\n| Pommes | Pommes rouges fraîches | 5 |\n| Pain | Pain de blé entier | 2 |\n| Lait | Bouteille de 1 litre | 1 |\n\n- [ ] Lire [guide d'installation](https://example.com/guide).\n    - Enregistrer le fichier dans `/tmp/example.py`.\n\n> **Remarque:** Veuillez vérifier les quantités.\n\n```sh\nprintf 'hello'\n```\n"
+    },
+    {
+      "target": "es",
+      "seconds": 1.32,
+      "table_rows_preserved": true,
+      "translation": "## Lista de compras\n\n| Tema | Descripción | Cantidad |\n| :--- | --- | ---: |\n| Apples | manzanas rojas frescas | 5 |\n| Pan | Pan integral de trigo | 2 |\n| Milk | Botella de 1 litro | 1 |\n\n- [ ] Leer el [guía de instalación](https://example.com/guide).\n    - Guarda el archivo en `/tmp/example.py`.\n\n> **Nota:** Por favor, compruebe las cantidades.\n\n```sh\nprintf 'hello'\n```\n"
+    }
+  ],
+  "gui_modes_passed": [
+    "bilingual",
+    "translated"
+  ],
+  "cache_clear_10000_seconds": 0.0005
+}
