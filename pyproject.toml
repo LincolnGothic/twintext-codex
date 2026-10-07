@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twintext-codex"
+version = "0.1.0"
+description = "Offline bilingual replies for Codex on Linux, powered by Argos Translate"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = "MIT"
+authors = [{name = "LincolnGothic"}]
+dependencies = ["langdetect==1.0.9"]
+
+[project.optional-dependencies]
+engine = ["argostranslate==1.11.0"]
+dev = ["ruff>=0.13,<1"]
+
+[project.scripts]
+twintext = "twintext.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+twintext = ["web/*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

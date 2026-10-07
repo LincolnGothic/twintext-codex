@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TwinText · Offline translation for Codex</title>
+  <style>{{CSS}}</style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">T<span>T</span></span><div><h1>TwinText</h1><p data-i18n="tagline">Offline translation for Codex</p></div></div>
+      <span class="badge"><span aria-hidden="true">●</span> <span data-i18n="local">On your computer</span></span>
+    </header>
+    <div class="intro"><p class="eyebrow" data-i18n="eyebrow">TWO LANGUAGES. ONE CONVERSATION.</p><h2 data-i18n="headline">Read it your way.</h2><p data-i18n="intro">Keep the original beside its translation, or focus on just the translation.</p></div>
+    <div class="layout">
+      <section class="card settings" aria-labelledby="preferences-title">
+        <h3 id="preferences-title" data-i18n="preferences">Preferences</h3>
+        <form id="settings-form">
+          <label for="target" data-i18n="target">Translate into</label><select id="target" name="target"></select>
+          <label for="source" data-i18n="source">Source language</label><select id="source" name="source"></select>
+          <fieldset><legend data-i18n="display">Display mode</legend><div class="mode-group">
+            <label><input type="radio" name="mode" value="bilingual" checked><span data-i18n="bilingual">Bilingual</span><small data-i18n="both">Original + translation</small></label>
+            <label><input type="radio" name="mode" value="translated"><span data-i18n="translated">Translation only</span><small data-i18n="translationOnly">A focused reading view</small></label>
+            <label><input type="radio" name="mode" value="original"><span data-i18n="original">Original</span><small data-i18n="originalOnly">Pause translation</small></label>
+          </div></fieldset>
+          <label for="ui-language" data-i18n="uiLanguage">Plugin display language</label><select id="ui-language" name="ui_language"></select>
+          <p class="hint" data-i18n="followHint">Automatic follows Codex's language in an embedded panel, or your browser's language here.</p>
+          <label class="check"><input type="checkbox" id="enabled" checked><span data-i18n="enabled">Translate new Codex replies</span></label>
+          <label class="check"><input type="checkbox" id="cache" checked><span data-i18n="cache">Remember translations locally</span></label>
+          <button type="submit" class="primary" id="save" data-i18n="save">Save preferences</button>
+          <p class="hint" data-i18n="nextReply">Preferences apply to new replies in chats with TwinText enabled.</p>
+        </form>
+      </section>
+      <div class="right-column">
+        <section class="card preview" aria-labelledby="preview-title">
+          <div class="section-heading"><h3 id="preview-title" data-i18n="preview">Try a translation</h3><span class="subtle" data-i18n="private">Private by default</span></div>
+          <label class="sr-only" for="input" data-i18n="inputLabel">Text to translate</label>
+          <textarea id="input" maxlength="100000" spellcheck="false" data-placeholder="placeholder" placeholder="Paste a paragraph or a Markdown reply…"></textarea>
+          <div class="input-actions"><span class="hint" data-i18n="preserve">Code, paths, and links stay intact.</span><button class="primary" id="translate" type="button" data-i18n="translate">Translate</button></div>
+          <div id="result" aria-live="polite"><div class="empty"><span aria-hidden="true">↔</span><p data-i18n="empty">Your translation appears here.</p></div></div>
+          <div id="route" class="hint"></div>
+          <button id="copy" class="text-button" hidden type="button" data-i18n="copy">Copy displayed text</button>
+        </section>
+        <section class="card models" aria-labelledby="models-title">
+          <div class="section-heading"><h3 id="models-title" data-i18n="models">Language pack</h3><span class="pill" data-i18n="noFees">No API fees</span></div>
+          <p data-i18n="modelInfo">English, Chinese, Japanese, French, and Spanish. Download once, then translate offline.</p>
+          <p id="model-status" class="hint"></p><div id="model-list"></div>
+          <button id="install" class="secondary" type="button" data-i18n="install">Download the five-language pack</button>
+          <button id="clear-cache" class="text-button" type="button" data-i18n="clearCache">Clear remembered translations</button>
+        </section>
+      </div>
+    </div>
+    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.1.0 · MIT</span></footer>
+  </main>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <script nonce="{{TOKEN}}">window.TWINTEXT_BOOT = {token: "{{TOKEN}}", embedded: {{EMBEDDED}}};
+{{JS}}</script>
+</body>
+</html>
+

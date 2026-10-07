@@ -1,0 +1,198 @@
+{
+  "pairs_checked": 20,
+  "offline": true,
+  "results": [
+    {
+      "source": "en",
+      "target": "zh",
+      "route": [
+        "en",
+        "zh"
+      ],
+      "translation": "程序现在起作用了。  请保存文件 。"
+    },
+    {
+      "source": "en",
+      "target": "ja",
+      "route": [
+        "en",
+        "ja"
+      ],
+      "translation": "プログラムが今のところ動作します。 保存してください。"
+    },
+    {
+      "source": "en",
+      "target": "fr",
+      "route": [
+        "en",
+        "fr"
+      ],
+      "translation": "Le programme fonctionne maintenant. S'il vous plaît enregistrer le fichier."
+    },
+    {
+      "source": "en",
+      "target": "es",
+      "route": [
+        "en",
+        "es"
+      ],
+      "translation": "El programa funciona ahora. Por favor, guarda el archivo."
+    },
+    {
+      "source": "zh",
+      "target": "en",
+      "route": [
+        "zh",
+        "en"
+      ],
+      "translation": "The program is now operational.  Please save the file."
+    },
+    {
+      "source": "zh",
+      "target": "ja",
+      "route": [
+        "zh",
+        "en",
+        "ja"
+      ],
+      "translation": "プログラムの運用を開始しました。 保存してください。"
+    },
+    {
+      "source": "zh",
+      "target": "fr",
+      "route": [
+        "zh",
+        "en",
+        "fr"
+      ],
+      "translation": "Le programme est maintenant opérationnel. S'il vous plaît enregistrer le fichier."
+    },
+    {
+      "source": "zh",
+      "target": "es",
+      "route": [
+        "zh",
+        "en",
+        "es"
+      ],
+      "translation": "El programa está en funcionamiento. Por favor, guarda el archivo."
+    },
+    {
+      "source": "ja",
+      "target": "en",
+      "route": [
+        "ja",
+        "en"
+      ],
+      "translation": "The program works normally. Save the file."
+    },
+    {
+      "source": "ja",
+      "target": "zh",
+      "route": [
+        "ja",
+        "en",
+        "zh"
+      ],
+      "translation": "程序正常运行. 保存文件。"
+    },
+    {
+      "source": "ja",
+      "target": "fr",
+      "route": [
+        "ja",
+        "en",
+        "fr"
+      ],
+      "translation": "Le programme fonctionne normalement. Enregistrez le fichier."
+    },
+    {
+      "source": "ja",
+      "target": "es",
+      "route": [
+        "ja",
+        "en",
+        "es"
+      ],
+      "translation": "El programa funciona normalmente. Guarda el archivo."
+    },
+    {
+      "source": "fr",
+      "target": "en",
+      "route": [
+        "fr",
+        "en"
+      ],
+      "translation": "The program now works.  Please save the file."
+    },
+    {
+      "source": "fr",
+      "target": "zh",
+      "route": [
+        "fr",
+        "en",
+        "zh"
+      ],
+      "translation": "程序现在起作用了。  请保存文件 。"
+    },
+    {
+      "source": "fr",
+      "target": "ja",
+      "route": [
+        "fr",
+        "en",
+        "ja"
+      ],
+      "translation": "プログラムが機能します。 保存してください。"
+    },
+    {
+      "source": "fr",
+      "target": "es",
+      "route": [
+        "fr",
+        "en",
+        "es"
+      ],
+      "translation": "El programa ahora funciona. Por favor, guarda el archivo."
+    },
+    {
+      "source": "es",
+      "target": "en",
+      "route": [
+        "es",
+        "en"
+      ],
+      "translation": "The program works now. Please save the file."
+    },
+    {
+      "source": "es",
+      "target": "zh",
+      "route": [
+        "es",
+        "en",
+        "zh"
+      ],
+      "translation": "程序现在起作用了。  请保存文件 。"
+    },
+    {
+      "source": "es",
+      "target": "ja",
+      "route": [
+        "es",
+        "en",
+        "ja"
+      ],
+      "translation": "プログラムが今のところ動作します。 保存してください。"
+    },
+    {
+      "source": "es",
+      "target": "fr",
+      "route": [
+        "es",
+        "en",
+        "fr"
+      ],
+      "translation": "Le programme fonctionne maintenant. S'il vous plaît enregistrer le fichier."
+    }
+  ]
+}

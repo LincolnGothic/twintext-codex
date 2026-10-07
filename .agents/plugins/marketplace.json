@@ -1,0 +1,11 @@
+{
+  "name": "twintext-local",
+  "interface": {"displayName": "TwinText"},
+  "plugins": [{
+    "name": "twintext",
+    "source": {"source": "local", "path": "./plugins/twintext"},
+    "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+    "category": "Productivity"
+  }]
+}
+

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "twintext",
+  "version": "0.1.0",
+  "description": "Offline bilingual replies for Codex on Linux using Argos Translate.",
+  "author": {"name": "LincolnGothic"},
+  "license": "MIT",
+  "repository": "https://github.com/LincolnGothic/twintext-codex",
+  "keywords": ["translation", "bilingual", "offline", "linux", "codex"],
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "interface": {
+        "displayName": "TwinText for Codex",
+        "shortDescription": "Read new replies in two languages, offline",
+        "longDescription": "Translate new Codex replies with local Argos models. Choose bilingual, translated-only, or original display, plus independent translation and interface languages.",
+        "developerName": "LincolnGothic",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write", "Interactive"],
+        "websiteURL": "https://github.com/LincolnGothic/twintext-codex",
+        "composerIcon": "./assets/icon.svg",
+        "logo": "./assets/icon.svg",
+        "brandColor": "#196D5D",
+        "defaultPrompt": ["Open TwinText settings", "Translate this reply with TwinText"]
+      }
+    }
+  }
+}
+

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "twintext": {
+      "command": "python3",
+      "args": ["${PLUGIN_ROOT}/scripts/launch.py", "mcp"],
+      "cwd": "${PLUGIN_ROOT}",
+      "env": {"PYTHONUNBUFFERED": "1"},
+      "tool_timeout_sec": 3600
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "twintext",
+  "version": "0.1.0",
+  "description": "Offline bilingual replies for Codex on Linux using Argos Translate.",
+  "author": {"name": "LincolnGothic"},
+  "license": "MIT",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "TwinText for Codex",
+    "shortDescription": "Read new replies in two languages, offline",
+    "developerName": "LincolnGothic",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write", "Interactive"],
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg",
+    "brandColor": "#196D5D"
+  }
+}
+
