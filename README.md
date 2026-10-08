@@ -157,6 +157,8 @@ table. See [format coverage and limits](docs/output-formats.md).
 
 - **Collapse** shows a compact TwinText button. Drag its six-dot grip or deliberately
   drag the button to move it; click the button to expand. A dot indicates a new reply.
+  Its **×** button quits TwinText. Closing either window also quits; use **−**
+  to collapse. Quit preserves the auto-start setting; when enabled, a later reply can reopen it.
 - Drag the reader header to move it; use its bottom-right grip to resize. Settings
   scroll in smaller windows. **Keep above other windows** requests always-on-top behavior.
 - The selector retains the latest reply from up to **24 chats**. Desktop receives

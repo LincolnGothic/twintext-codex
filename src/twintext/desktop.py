@@ -4,7 +4,7 @@ import queue
 import sqlite3
 import threading
 
-from PySide6.QtCore import QLocale, Qt, QTimer
+from PySide6.QtCore import QEvent, QLocale, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -490,6 +490,7 @@ class Companion(QWidget):
         self.orb = QWidget(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         self.orb.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.orb.setWindowTitle("TwinText")
+        self.orb.installEventFilter(self)
         self.orb.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         orb_layout = QHBoxLayout(self.orb)
         orb_layout.setContentsMargins(0, 0, 0, 0)
@@ -505,8 +506,13 @@ class Companion(QWidget):
         self.orb_button.setMinimumSize(116, 36)
         self.orb_button.clicked.connect(self.expand)
         panel_layout.addWidget(self.orb_button)
+        self.orb_quit_button = QPushButton("×")
+        self.orb_quit_button.setObjectName("orbQuit")
+        self.orb_quit_button.setFixedSize(28, 36)
+        self.orb_quit_button.clicked.connect(self.quit)
+        panel_layout.addWidget(self.orb_quit_button)
         orb_layout.addWidget(panel)
-        self.orb.setFixedSize(164, 48)
+        self.orb.setFixedSize(196, 48)
         self.setStyleSheet(STYLE)
         self.orb.setStyleSheet(STYLE)
         self.localize()
@@ -520,7 +526,7 @@ class Companion(QWidget):
         self.translate_button.clicked.connect(self.translate_manual)
         self.copy_button.clicked.connect(self.copy)
         self.clear_button.clicked.connect(self.clear)
-        self.quit_button.clicked.connect(QApplication.instance().quit)
+        self.quit_button.clicked.connect(self.quit)
         self.sessions.currentIndexChanged.connect(self.select_reply)
         for combo in self.selects.values():
             combo.currentIndexChanged.connect(self.save_preferences)
@@ -558,6 +564,8 @@ class Companion(QWidget):
         self.orb_handle.setAccessibleName(self.t("drag"))
         self.orb_button.setToolTip(self.t("expand"))
         self.orb_button.setAccessibleName(self.t("expand"))
+        self.orb_quit_button.setToolTip(self.t("quit"))
+        self.orb_quit_button.setAccessibleName(self.t("quit"))
         self.checks["cache"].setToolTip(self.t("cache_hint"))
         self.clear_button.setToolTip(self.t("inbox_hint"))
         for key, combo in self.selects.items():
@@ -647,9 +655,20 @@ class Companion(QWidget):
         except (OSError, sqlite3.Error) as exc:
             self.status.setText(str(exc))
 
+    def quit(self):
+        self.timer.stop()
+        self.hide()
+        self.orb.hide()
+        QApplication.instance().quit()
+
     def closeEvent(self, event):
-        event.ignore()
-        self.collapse()
+        event.accept()
+        self.quit()
+
+    def eventFilter(self, watched, event):
+        if watched is self.orb and event.type() == QEvent.Type.Close:
+            self.quit()
+        return super().eventFilter(watched, event)
 
     def paste(self):
         self.editor.show()
@@ -769,9 +788,10 @@ padding: 14px; font-size: 14px; }
 QFrame#preferences { background: #edf4ef; border-radius: 9px; }
 QFrame#orbPanel { background: #173f35; border: 1px solid #396757; border-radius: 23px; }
 QFrame#orbPanel QWidget { background: transparent; }
-QPushButton#orbExpand { background: transparent; color: #f0fff8; border: none;
+QPushButton#orbExpand, QPushButton#orbQuit { background: transparent; color: #f0fff8; border: none;
 border-radius: 18px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
-QPushButton#orbExpand:hover { background: #285647; }
+QPushButton#orbExpand:hover, QPushButton#orbQuit:hover { background: #285647; }
+QPushButton#orbQuit { padding: 0; font-size: 18px; }
 QCheckBox { padding: 2px; }
 """
 
@@ -803,4 +823,6 @@ def run(background=False):
     try:
         return app.exec()
     finally:
+        window.hide()
+        window.orb.hide()
         lock.close()
