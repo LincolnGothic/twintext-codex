@@ -64,7 +64,7 @@ def main(argv=None):
     # hook pipes are UTF-8; keep the five supported languages intact everywhere.
     for stream in (sys.stdin, sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8")
+            stream.reconfigure(encoding="utf-8", newline="\n")
     args = parser().parse_args(argv)
     try:
         if args.command == "mcp":

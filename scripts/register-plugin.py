@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 plugin = Path(sys.argv[1]).resolve()
-home = Path.home()
+home = Path.home().resolve()
 try:
     relative = plugin.relative_to(home)
 except ValueError:

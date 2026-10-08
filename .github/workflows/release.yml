@@ -8,7 +8,31 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: twintext-release-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
+  regressions:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.13']
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
+      - run: python -m pip install -e '.[dev,desktop]'
+      - run: python -m unittest discover -s tests -v
+      - run: ruff check .
   validate:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -49,7 +73,7 @@ jobs:
             dist/SHA256SUMS-*.txt
           retention-days: 1
   publish:
-    needs: validate
+    needs: [validate, regressions]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -69,6 +93,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          task_head=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')
+          if [ "${task_head}" != "${GITHUB_SHA}" ]; then
+            printf 'A newer main commit exists; skipping this outdated release.\n'
+            exit 0
+          fi
           task_version=$(python -c 'import re,pathlib; print(re.search(r"^version = \"([^\"]+)\"", pathlib.Path("pyproject.toml").read_text(), re.M)[1])')
           if gh release view "v${task_version}" >/dev/null 2>&1; then
             printf 'Release already exists; bump the version for another release.\n'

@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import tempfile
 import unittest
 import zipfile
@@ -133,6 +134,19 @@ class CoreTests(unittest.TestCase):
         self.service.translate("Hello")
         self.assertEqual(len(self.engine.calls), 2)
         self.assertFalse(Path(self.directory.name, "translations.sqlite3").exists())
+
+    def test_cache_connections_close_on_success_and_rollback_on_error(self):
+        cache = Cache()
+        with cache.connect() as connection:
+            connection.execute("INSERT INTO translations VALUES ('kept', 'value', 0)")
+        with self.assertRaises(sqlite3.ProgrammingError):
+            connection.execute("SELECT 1")
+        with self.assertRaises(RuntimeError), cache.connect() as failed:
+            failed.execute("DELETE FROM translations")
+            raise RuntimeError("cancel transaction")
+        with self.assertRaises(sqlite3.ProgrammingError):
+            failed.execute("SELECT 1")
+        self.assertEqual(cache.get("kept"), "value")
 
     def test_cache_is_bounded_and_disabling_preserves_existing_entries(self):
         cache = Cache()

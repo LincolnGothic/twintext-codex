@@ -27,10 +27,13 @@ class Inbox:
 
     @contextmanager
     def connection(self):
-        connection = sqlite3.connect(self.path, timeout=2)
+        connection = sqlite3.connect(self.path, timeout=5)
         self.path.chmod(0o600)
         connection.row_factory = sqlite3.Row
         try:
+            # Reserve the writer before reading: concurrent read-then-write upgrades
+            # can otherwise deadlock without honoring SQLite's busy timeout.
+            connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS replies ("
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, session TEXT UNIQUE NOT NULL, "

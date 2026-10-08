@@ -1,6 +1,7 @@
 # Windows/Linux 0.3.0 preview validation
 
-- Linux: 71 regression tests pass, including Chat/Stop separation, legacy/future settings preservation, native cross-process locks, UTF-8 pipes and the two display modes.
+- Linux: 72 regression tests pass, including Chat/Stop separation, legacy/future settings preservation, native cross-process locks, UTF-8 pipes and the two display modes.
+- Native CI exposed and repaired concurrent inbox read/write lock upgrades, unclosed cache connections, Windows hook process lifetime, canonical Windows home paths and newline handling. Cache connection closure and transaction rollback have explicit regression coverage.
 - Actual Codex 0.162.0-alpha.2 `plugin/read` discovers SessionStart, UserPromptSubmit and Stop from the compatibility package, plus its MCP server. This read-only probe did not change hook trust or run a model turn.
 - Existing offline models translate the shopping-table fixture into Chinese, Japanese, French and Spanish; table shape and numeric cells remain intact. The Qt reader renders bilingual and translated-only results. These tests are not a human translation-quality assessment.
 - Ruff, JavaScript syntax, Linux installer syntax and skill validation pass. Source-installer archives are checked for private runtime/data/model files and have SHA-256 checksums.

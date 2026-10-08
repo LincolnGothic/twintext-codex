@@ -4,6 +4,7 @@ import hashlib
 import json
 import sqlite3
 import time
+from contextlib import contextmanager
 
 from twintext.config import data_dir, private_dir
 
@@ -12,14 +13,20 @@ class Cache:
     def __init__(self):
         self.path = private_dir(data_dir()) / "translations.sqlite3"
 
+    @contextmanager
     def connect(self):
         connection = sqlite3.connect(self.path, timeout=10)
-        connection.execute(
-            "CREATE TABLE IF NOT EXISTS translations "
-            "(key TEXT PRIMARY KEY, value TEXT NOT NULL, used INTEGER NOT NULL)"
-        )
-        self.path.chmod(0o600)
-        return connection
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS translations "
+                "(key TEXT PRIMARY KEY, value TEXT NOT NULL, used INTEGER NOT NULL)"
+            )
+            self.path.chmod(0o600)
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     @staticmethod
     def key(text: str, source: str, target: str, fingerprint: str):

@@ -1,6 +1,7 @@
 """Resolve the installed private Python environment across plugin cache copies."""
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -18,4 +19,9 @@ if not python.is_file():
         file=sys.stderr,
     )
     sys.exit(1)
-os.execv(str(python), [str(python), "-m", "twintext.cli", *sys.argv[1:]])
+command = [str(python), "-m", "twintext.cli", *sys.argv[1:]]
+if sys.platform == "win32":
+    # Windows execv exits its parent before the new process finishes. Hooks must
+    # wait for capture/context, and MCP must retain its stdio process lifetime.
+    sys.exit(subprocess.call(command))
+os.execv(str(python), command)
