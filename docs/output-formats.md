@@ -1,4 +1,10 @@
-# Output-format coverage in Desktop 0.2.2
+# Output-format coverage in TwinText 0.3.0
+
+Chat, Desktop, CLI and settings previews use the same Markdown translator. The
+format fixes introduced in 0.2.2 are shared by both styles in 0.3.0. Desktop uses
+Qt to render Markdown; Chat uses Codex's renderer, so visual layout can differ.
+The shared parser tests establish structural preservation rather than identical
+presentation in every host. See [validation evidence](validation.md).
 
 | Output | Behavior | Verification |
 | --- | --- | --- |
@@ -16,7 +22,7 @@
 | Raw HTML blocks, reference definitions, display math, Codex directives | Preserve verbatim. | Single/multiline formulas, HTML and directive fixtures. |
 | Incomplete/malformed Markdown | Preserve original source, avoid crashing; recognizable text may translate. | Malformed link/table/fence and empty/numeric fixtures. |
 
-Bilingual tables are two complete tables, original then translated, with the same columns. Translation-only renders just the translated table. The copy action returns the same Markdown used for display. The original inbox message is never rewritten.
+Bilingual tables are two complete tables, original then translated, with the same columns. Translation-only renders just the translated table. The copy action returns the same Markdown used for display. Desktop's original inbox message is never rewritten; Chat emits a new final reply rather than editing earlier messages.
 
 Markdown block structure uses markdown-it-py; inline/source reconstruction retains original delimiters rather than serializing a parsed tree. Model-generated pipes and line breaks are escaped/flattened inside table cells so they cannot create extra rows or columns.
 
