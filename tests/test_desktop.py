@@ -110,6 +110,27 @@ class DesktopTests(unittest.TestCase):
         self.window.poll()
         self.assertEqual(self.window.settings_button.text(), "Paramètres")
 
+    def test_translation_location_is_saved_without_changing_language_or_mode(self):
+        self.window.selects["workflow"].setCurrentIndex(1)
+        settings = load_settings()
+        self.assertEqual(settings.workflow, "chat")
+        self.assertEqual(settings.target, "zh")
+        self.assertEqual(settings.mode, "bilingual")
+        self.window.selects["workflow"].setCurrentIndex(0)
+        self.assertEqual(load_settings().workflow, "desktop")
+
+    def test_settings_scroll_in_a_small_window_without_clipping_controls(self):
+        self.window.show()
+        self.window.resize(480, 560)
+        self.window.settings_button.click()
+        self.app.processEvents()
+        self.assertTrue(self.window.preference_scroll.isVisible())
+        self.assertGreater(self.window.preference_scroll.verticalScrollBar().maximum(), 0)
+        self.window.preference_scroll.ensureWidgetVisible(self.window.cache_button)
+        self.app.processEvents()
+        for combo in self.window.selects.values():
+            self.assertGreaterEqual(combo.height(), combo.fontMetrics().height())
+
     def test_model_error_shows_original_and_clear_invalidates_pending_work(self):
         self.inbox.publish(payload(text="Hello"))
         self.window.poll()

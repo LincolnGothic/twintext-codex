@@ -21,7 +21,7 @@ class InstallationTests(unittest.TestCase):
         self.assertFalse((plugin / "plugin.json").exists())
         manifest = json.loads((plugin / ".codex-plugin/plugin.json").read_text())
         hooks = json.loads((plugin / manifest["hooks"]).read_text())
-        self.assertEqual(list(hooks["hooks"]), ["Stop"])
+        self.assertEqual(set(hooks["hooks"]), {"SessionStart", "UserPromptSubmit", "Stop"})
         command = hooks["hooks"]["Stop"][0]["hooks"][0]["command"]
         self.assertIn("${PLUGIN_ROOT}/hooks/capture.py", command)
         mcp = json.loads((plugin / manifest["mcpServers"]).read_text())

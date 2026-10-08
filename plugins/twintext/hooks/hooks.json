@@ -1,5 +1,40 @@
 {
   "hooks": {
-    "Stop": [{"hooks": [{"type": "command", "command": "python3 \"${PLUGIN_ROOT}/hooks/capture.py\"", "timeout": 10}]}]
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/context.py\"",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}/hooks/context.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/context.py\"",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}/hooks/context.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/capture.py\"",
+            "commandWindows": "py -3 \"${PLUGIN_ROOT}/hooks/capture.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSizeGrip,
     QTextBrowser,
     QVBoxLayout,
@@ -24,7 +25,14 @@ from PySide6.QtWidgets import (
 
 from twintext.bridge import Inbox, desktop_lock
 from twintext.cache import Cache
-from twintext.config import LANGUAGES, MODES, TwinTextError, load_settings, update_settings
+from twintext.config import (
+    LANGUAGES,
+    MODES,
+    WORKFLOWS,
+    TwinTextError,
+    load_settings,
+    update_settings,
+)
 from twintext.service import Service
 
 WORDS = {
@@ -268,6 +276,16 @@ WORDS = {
 }
 
 
+for _language, _labels in {
+    "en": ("Translation location", "Floating window", "Codex chat"),
+    "zh": ("翻译显示位置", "浮动窗口", "Codex 聊天"),
+    "ja": ("翻訳の表示先", "フローティングウィンドウ", "Codex チャット"),
+    "fr": ("Emplacement de la traduction", "Fenêtre flottante", "Conversation Codex"),
+    "es": ("Ubicación de traducción", "Ventana flotante", "Chat de Codex"),
+}.items():
+    WORDS[_language].update(dict(zip(("workflow", "desktop", "chat"), _labels, strict=True)))
+
+
 def display_text(result, mode):
     if mode == "original":
         return result["original"]
@@ -411,7 +429,7 @@ class Companion(QWidget):
         form = QFormLayout(self.preferences)
         self.selects = {}
         self.labels = {}
-        for key in ("source", "target", "mode", "ui"):
+        for key in ("workflow", "source", "target", "mode", "ui"):
             label = QLabel()
             combo = QComboBox()
             self.labels[key] = label
@@ -428,8 +446,14 @@ class Companion(QWidget):
         form.addRow(self.locale_hint)
         self.cache_button = QPushButton()
         form.addRow(self.cache_button)
-        self.preferences.hide()
-        layout.addWidget(self.preferences)
+        self.preference_scroll = QScrollArea()
+        self.preference_scroll.setWidgetResizable(True)
+        self.preference_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.preference_scroll.setWidget(self.preferences)
+        self.preference_scroll.setMinimumHeight(140)
+        self.preference_scroll.setMaximumHeight(360)
+        self.preference_scroll.hide()
+        layout.addWidget(self.preference_scroll)
         self.reader = Reader()
         self.reader.setOpenLinks(False)
         self.reader.setOpenExternalLinks(False)
@@ -488,7 +512,7 @@ class Companion(QWidget):
         self.localize()
         self.apply_pin()
         self.settings_button.clicked.connect(
-            lambda: self.preferences.setVisible(not self.preferences.isVisible())
+            lambda: self.preference_scroll.setVisible(not self.preference_scroll.isVisible())
         )
         self.collapse_button.clicked.connect(self.collapse)
         self.cache_button.clicked.connect(self.clear_cache)
@@ -539,7 +563,7 @@ class Companion(QWidget):
         for key, combo in self.selects.items():
             combo.blockSignals(True)
             combo.clear()
-            codes = MODES if key == "mode" else list(LANGUAGES)
+            codes = WORKFLOWS if key == "workflow" else MODES if key == "mode" else list(LANGUAGES)
             if key in ("source", "ui"):
                 codes = ["auto", *codes]
             for code in codes:
@@ -565,6 +589,7 @@ class Companion(QWidget):
         previous = self.settings
         try:
             self.settings = update_settings(
+                workflow=self.selects["workflow"].currentData(),
                 source=self.selects["source"].currentData(),
                 target=self.selects["target"].currentData(),
                 mode=self.selects["mode"].currentData(),
@@ -737,6 +762,8 @@ QPushButton:hover { background: #d6e8df; }
 QPushButton:disabled { color: #91a39a; }
 QComboBox, QPlainTextEdit { background: white; border: 1px solid #d2e1d8;
 border-radius: 7px; padding: 6px; }
+QComboBox { min-height: 20px; }
+QPushButton { min-height: 16px; }
 QTextBrowser#reader { background: white; border: 1px solid #d2e1d8; border-radius: 12px;
 padding: 14px; font-size: 14px; }
 QFrame#preferences { background: #edf4ef; border-radius: 9px; }

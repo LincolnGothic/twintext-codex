@@ -1,14 +1,17 @@
 """Small, atomically updated settings shared by CLI, hooks and the local UI."""
 
-import fcntl
 import json
 import os
+import sys
 import tempfile
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
+
+from twintext.locking import file_lock
 
 LANGUAGES = {"en": "English", "zh": "Chinese", "ja": "Japanese", "fr": "French", "es": "Spanish"}
 MODES = ("bilingual", "translated", "original")
+WORKFLOWS = ("desktop", "chat")
 
 
 class TwinTextError(Exception):
@@ -17,6 +20,8 @@ class TwinTextError(Exception):
 
 def data_dir() -> Path:
     override = os.environ.get("TWINTEXT_HOME")
+    if not override and sys.platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "TwinText"
     return (
         Path(override).expanduser()
         if override
@@ -26,6 +31,8 @@ def data_dir() -> Path:
 
 def config_dir() -> Path:
     override = os.environ.get("TWINTEXT_HOME")
+    if not override and sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", str(Path.home() / "AppData/Roaming"))) / "TwinText"
     return (
         Path(override).expanduser()
         if override
@@ -50,8 +57,11 @@ class Settings:
     host_locale: str = "auto"
     desktop_auto_start: bool = True
     always_on_top: bool = True
+    workflow: str = "desktop"
 
     def validate(self):
+        if self.workflow not in WORKFLOWS:
+            raise TwinTextError("Workflow must be desktop or chat.")
         if self.source not in ("auto", *LANGUAGES):
             raise TwinTextError("Source must be auto, en, zh, ja, fr, or es.")
         if self.target not in LANGUAGES:
@@ -81,20 +91,22 @@ def load_settings() -> Settings:
         value = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(value, dict):
             raise ValueError("expected an object")
-        return Settings(**value).validate()
+        known = {field.name for field in fields(Settings)}
+        return Settings(**{key: item for key, item in value.items() if key in known}).validate()
     except (OSError, ValueError, TypeError) as exc:
         raise TwinTextError(f"Cannot read {path}: {exc}") from exc
 
 
 def update_settings(**changes) -> Settings:
     folder = private_dir(config_dir())
-    with (folder / "settings.lock").open("a", encoding="utf-8") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with file_lock(folder / "settings.lock"):
         settings = replace(load_settings(), **changes).validate()
+        path = folder / "settings.json"
+        previous = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
         fd, temporary = tempfile.mkstemp(prefix="settings-", suffix=".tmp", dir=folder)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                json.dump(settings.as_dict(), stream, ensure_ascii=False, indent=2)
+                json.dump({**previous, **settings.as_dict()}, stream, ensure_ascii=False, indent=2)
                 stream.write("\n")
                 stream.flush()
                 os.fsync(stream.fileno())

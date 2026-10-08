@@ -5,7 +5,7 @@ import sys
 
 from twintext import __version__
 from twintext.cache import Cache
-from twintext.config import LANGUAGES, MODES, TwinTextError, update_settings
+from twintext.config import LANGUAGES, MODES, WORKFLOWS, TwinTextError, update_settings
 from twintext.engine import STARTER_PAIRS
 from twintext.service import Service
 
@@ -53,6 +53,7 @@ def tools():
             "Save TwinText translation and display preferences.",
             {
                 "source": {"type": "string", "enum": ["auto", *LANGUAGES]},
+                "workflow": {"type": "string", "enum": list(WORKFLOWS)},
                 "target": LANGUAGE_SCHEMA,
                 "mode": {"type": "string", "enum": list(MODES)},
                 "ui_language": {"type": "string", "enum": ["auto", *LANGUAGES]},
@@ -76,7 +77,8 @@ def tools():
             "twintext_open_desktop",
             "Open the local floating TwinText reader. Completed Codex replies are translated "
             "in this window by the Stop hook, without returning translations to the model.",
-            {}, read_only=False,
+            {},
+            read_only=False,
         ),
         tool(
             "twintext_install_models",

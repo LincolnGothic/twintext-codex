@@ -11,6 +11,14 @@
   };
   const desktopWords = {"en": {"openDesktop": "Open floating reader", "desktopOpened": "Floating reader opened.", "nextReply": "Completed replies appear in the floating reader. Translations stay outside the chat."}, "zh": {"openDesktop": "打开浮动阅读窗口", "desktopOpened": "已打开浮动阅读窗口。", "nextReply": "完整回复显示在浮动窗口中，译文不会进入聊天上下文。"}, "ja": {"openDesktop": "フローティングリーダーを開く", "desktopOpened": "リーダーを開きました。", "nextReply": "完了した返信は別のウィンドウに表示され、翻訳はチャットに追加されません。"}, "fr": {"openDesktop": "Ouvrir le lecteur flottant", "desktopOpened": "Lecteur flottant ouvert.", "nextReply": "Les réponses terminées apparaissent dans le lecteur flottant. Les traductions restent hors du chat."}, "es": {"openDesktop": "Abrir el lector flotante", "desktopOpened": "Lector flotante abierto.", "nextReply": "Las respuestas completas aparecen en el lector flotante. Las traducciones quedan fuera del chat."}};
   for (const [code, words] of Object.entries(desktopWords)) Object.assign(translations[code], words);
+  const workflowWords = {
+    en: {workflow:"Translation location", desktop:"Floating window", chat:"Codex chat", nextReply:"Start a new Codex chat after switching location. Chat mode uses Codex tokens; the floating window displays translations separately."},
+    zh: {workflow:"翻译显示位置", desktop:"浮动窗口", chat:"Codex 聊天", nextReply:"切换显示位置后，请新建 Codex 聊天。聊天模式消耗 Codex Token；浮动窗口单独显示译文。"},
+    ja: {workflow:"翻訳の表示先", desktop:"フローティングウィンドウ", chat:"Codex チャット", nextReply:"表示先を変更したら新しいチャットを開始してください。チャット表示は Codex トークンを使い、ウィンドウ表示は翻訳を別に表示します。"},
+    fr: {workflow:"Emplacement de la traduction", desktop:"Fenêtre flottante", chat:"Conversation Codex", nextReply:"Ouvrez une nouvelle conversation après un changement. Le mode conversation utilise des tokens Codex ; la fenêtre affiche les traductions séparément."},
+    es: {workflow:"Ubicación de traducción", desktop:"Ventana flotante", chat:"Chat de Codex", nextReply:"Abre un chat nuevo al cambiar de ubicación. El modo chat usa tokens Codex; la ventana muestra las traducciones por separado."}
+  };
+  for (const [code, words] of Object.entries(workflowWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
   let bridgeId = 0;
   const pending = new Map();
@@ -63,6 +71,9 @@
     for (const element of document.querySelectorAll("[data-i18n]")) element.textContent = t(element.dataset.i18n);
     for (const element of document.querySelectorAll("[data-placeholder]")) element.placeholder = t(element.dataset.placeholder);
     selectOptions($("source"), "auto"); selectOptions($("target")); selectOptions($("ui-language"), "follow");
+    const workflow = $("workflow").value || "desktop";
+    $("workflow").replaceChildren(new Option(t("desktop"), "desktop"), new Option(t("chat"), "chat"));
+    $("workflow").value = workflow;
     $("ui-language").value = chosen;
     if (lastStatus) showModels(lastStatus);
     if (lastResult) renderResult();
@@ -103,7 +114,7 @@
   $("settings-form").addEventListener("submit", async event => {
     event.preventDefault(); $("save").disabled = true;
     try {
-      lastStatus = await tool("twintext_set_settings", {target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
+      lastStatus = await tool("twintext_set_settings", {workflow:$("workflow").value,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
       localize(); notify(t("saved"));
     } catch (error) { notify(error.message, true); } finally { $("save").disabled = false; }
   });
@@ -128,7 +139,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.2.2"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.3.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }
@@ -137,6 +148,7 @@
         lastStatus = await tool("twintext_set_settings", {host_locale:baseLocale(hostLocale)});
       }
       const settings = lastStatus.settings;
+      $("workflow").value = settings.workflow || "desktop";
       $("target").value = settings.target; $("source").value = settings.source; $("ui-language").value = settings.ui_language;
       document.querySelector(`input[name=mode][value=${settings.mode}]`).checked = true;
       $("enabled").checked = settings.enabled; $("cache").checked = settings.cache;

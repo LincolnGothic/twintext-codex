@@ -42,8 +42,9 @@ class BridgeTests(unittest.TestCase):
         self.inbox.publish(payload(turn="next", text="Next"))
         self.assertEqual(len(self.inbox.replies()), 1)
         self.assertEqual(self.inbox.replies()[0]["text"], "Next")
-        self.assertEqual(self.inbox.path.stat().st_mode & 0o777, 0o600)
-        self.assertEqual(self.inbox.path.parent.stat().st_mode & 0o777, 0o700)
+        if os.name != "nt":
+            self.assertEqual(self.inbox.path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(self.inbox.path.parent.stat().st_mode & 0o777, 0o700)
 
     def test_bounded_concurrent_sessions_and_clear(self):
         with ThreadPoolExecutor(max_workers=4) as executor:

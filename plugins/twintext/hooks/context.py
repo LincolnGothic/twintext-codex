@@ -13,11 +13,12 @@ try:
         [sys.executable, str(runner), "context"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=8,
         check=False,
     )
     if result.returncode:
-        print(json.dumps({"systemMessage": "TwinText needs setup. Run its Linux install script."}))
+        print(json.dumps({"systemMessage": "TwinText needs setup. Run its installer."}))
     elif result.stdout.strip():
         print(
             json.dumps(

@@ -6,7 +6,6 @@ settings in the user's Argos configuration cannot affect this local engine.
 """
 
 import contextlib
-import fcntl
 import hashlib
 import json
 import os
@@ -18,6 +17,7 @@ from collections import OrderedDict, deque
 from pathlib import Path
 
 from twintext.config import LANGUAGES, TwinTextError, data_dir, private_dir
+from twintext.locking import file_lock
 
 STARTER_PAIRS = tuple(
     (a, b) for code in LANGUAGES if code != "en" for a, b in (("en", code), (code, "en"))
@@ -158,8 +158,7 @@ class ArgosEngine:
     def install(self, source: str, target: str):
         if source == target or source not in LANGUAGES or target not in LANGUAGES:
             raise TwinTextError("Choose two different supported languages.")
-        with self.lock, (private_dir(data_dir()) / "models.lock").open("a") as model_lock:
-            fcntl.flock(model_lock, fcntl.LOCK_EX)
+        with self.lock, file_lock(private_dir(data_dir()) / "models.lock"):
             package_module = self.package_module()
             if any(p.from_code == source and p.to_code == target for p in self.packages()):
                 return {"source": source, "target": target, "already_installed": True}

@@ -17,6 +17,7 @@
       <section class="card settings" aria-labelledby="preferences-title">
         <h3 id="preferences-title" data-i18n="preferences">Preferences</h3>
         <form id="settings-form">
+          <label for="workflow" data-i18n="workflow">Translation location</label><select id="workflow" name="workflow"></select>
           <label for="target" data-i18n="target">Translate into</label><select id="target" name="target"></select>
           <label for="source" data-i18n="source">Source language</label><select id="source" name="source"></select>
           <fieldset><legend data-i18n="display">Display mode</legend><div class="mode-group">
@@ -51,7 +52,7 @@
         </section>
       </div>
     </div>
-    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.2.2 · MIT</span></footer>
+    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.3.0 · MIT</span></footer>
   </main>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <script nonce="{{TOKEN}}">window.TWINTEXT_BOOT = {token: "{{TOKEN}}", embedded: {{EMBEDDED}}};

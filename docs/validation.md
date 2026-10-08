@@ -1,3 +1,13 @@
+# Windows/Linux 0.3.0 preview validation
+
+- Linux: 71 regression tests pass, including Chat/Stop separation, legacy/future settings preservation, native cross-process locks, UTF-8 pipes and the two display modes.
+- Actual Codex 0.162.0-alpha.2 `plugin/read` discovers SessionStart, UserPromptSubmit and Stop from the compatibility package, plus its MCP server. This read-only probe did not change hook trust or run a model turn.
+- Existing offline models translate the shopping-table fixture into Chinese, Japanese, French and Spanish; table shape and numeric cells remain intact. The Qt reader renders bilingual and translated-only results. These tests are not a human translation-quality assessment.
+- Ruff, JavaScript syntax, Linux installer syntax and skill validation pass. Source-installer archives are checked for private runtime/data/model files and have SHA-256 checksums.
+- Native Windows and Linux package installation, hook invocation, real English→Chinese table translation, Qt rendering and upgrade preservation are gated by the release workflow. Inspect the associated Actions run for current results; no Windows result is assumed before the job passes.
+- No runtime binaries or model weights are included in release ZIPs. Upstream legacy Spanish/Japanese model-license ambiguity is documented in THIRD_PARTY_NOTICES.md, not claimed resolved.
+- Native interactive Codex conversations, hook trust prompts and compositor window movement require host testing. The first Windows/Linux release is marked as a public preview.
+
 # Desktop v0.2.2 validation
 
 Validated on Linux x86-64 with Python 3.12 on October 7, 2026:

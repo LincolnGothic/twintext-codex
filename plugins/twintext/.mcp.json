@@ -4,7 +4,7 @@
       "command": "python3",
       "args": ["${PLUGIN_ROOT}/scripts/launch.py", "mcp"],
       "cwd": "${PLUGIN_ROOT}",
-      "env": {"PYTHONUNBUFFERED": "1"},
+      "env": {"PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"},
       "tool_timeout_sec": 3600
     }
   }

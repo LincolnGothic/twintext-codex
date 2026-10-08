@@ -1,57 +1,135 @@
-# TwinText Desktop for Codex
+# TwinText for Codex
 
-**An offline floating translation companion for Codex on Linux.** Read completed replies in two languages, or show only the translation. English, Chinese, Japanese, French, and Spanish are supported, with independent translation and interface language settings.
+**Free, open-source offline translation for Windows and Linux.** Choose bilingual,
+translation-only or original text in English, Chinese, Japanese, French and Spanish.
+Translation language and interface language are independent.
 
-![TwinText Desktop showing an English table and its Chinese translation](docs/tables.png)
+| Style | Where translations appear | Codex token usage |
+| --- | --- | --- |
+| **TwinText Chat** — the 0.1 experience, repaired | In new final replies inside Codex | Normal tool/context/output overhead; translations enter the conversation |
+| **TwinText Desktop** — the 0.2.2 experience | In a separate floating reader | Automatic capture makes no additional LLM requests and adds no translated text to model context |
 
-## How it works
+Both styles use the same current Markdown engine, settings, models and cache.
+Select **Translation location** in settings. Desktop is the default; start a new
+Codex chat after switching styles to discard old session instructions. Opening
+or configuring either style through chat can use ordinary Codex tokens.
 
-```text
-Codex completes its normal reply
-          ↓ trusted Stop hook (original text only)
-Private local inbox → Argos / CTranslate2 → floating TwinText reader
-```
+![TwinText showing a bilingual English–Chinese table](docs/tables.png)
 
-Translations stay in the companion window. The automatic workflow does not ask Codex to call a translation tool, add translations to the conversation, or generate a bilingual final reply. It makes no additional LLM inference requests and adds no translation text to model context. Opening/configuring TwinText through chat, plugin instructions/tool definitions, or explicitly requesting an in-chat translation can still add ordinary Codex token usage. Offline translation itself has no API fee.
+**0.3.0 is the first Windows/Linux dual-style public preview.** macOS is not
+released. [Release notes](docs/release-0.3.0.md) ·
+[Free downloads](https://github.com/LincolnGothic/twintext-codex/releases) ·
+[Third-party/model license notices](THIRD_PARTY_NOTICES.md).
 
-This release displays **completed replies**, rather than streaming partial responses. It does not change native Codex message bubbles, translate menus, read other applications, or follow individual paragraphs on screen. The standalone reader also works with text you paste yourself, without Codex or hook approval.
+## Install or upgrade
 
-Desktop **0.2.2** translates Markdown table headers/cells, visible link labels, nested lists, checkboxes, headings and quotes. Bilingual tables show the original table followed by its translated table; translation-only shows one translated table. [Output-format coverage and limits](docs/output-formats.md).
+Download and extract a Windows or Linux ZIP from Releases. Choose `chat` or
+`desktop` for your first-install default; all packages support both. Verify the
+ZIP using its matching SHA256SUMS file. These downloads contain **source code
+and installers**, not bundled executable apps. They require 64-bit Python
+**3.10–3.13** (3.12 recommended), pip and venv. Desktop also needs a graphical
+session. Python 3.14 is unsupported by model dependencies.
 
-## Install or upgrade on Linux
+Setup needs internet and several GB of disk space. It creates a private runtime
+with CPU-only PyTorch, Argos and Qt, plus a personal Codex marketplace entry.
+There is no translation API key, subscription, license activation or paid service.
+Neither a global Python environment nor Codex's application files are modified.
 
-Requires a graphical Linux session, Python **3.10–3.13**, `venv`, and `pip`. Python 3.14 is not supported by the model dependencies. No GPU, API key, or translation subscription is required. Installation needs internet for dependencies and initial models; allow a few gigabytes of free disk space.
+### Linux
+
+From the extracted ZIP folder, or a clone of this repository:
 
 ```bash
-git clone https://github.com/LincolnGothic/twintext-codex.git
-cd twintext-codex
 bash scripts/install-linux.sh
+# Optional explicit preferences / model downloads:
+bash scripts/install-linux.sh --workflow chat --download-models
 ```
 
-For an existing clone, run `git pull --ff-only` and the same installer. To select Python explicitly:
-
-```bash
-TWINTEXT_PYTHON=/usr/bin/python3.12 bash scripts/install-linux.sh --skip-models
-```
-
-`--skip-models` preserves installed models and skips downloads. The installer creates a private virtual environment with CPU-only PyTorch, Argos, and Qt, an app-menu entry named **TwinText Desktop**, and a personal Codex marketplace entry. It preserves unrelated marketplace entries and your saved settings.
-
-Qt may need desktop libraries supplied by your distribution. On Ubuntu/Debian, if startup reports missing libraries:
+Select Python explicitly with `TWINTEXT_PYTHON=/usr/bin/python3.12` if needed.
+The application menu contains **TwinText Desktop**. CLI: `~/.local/bin/twintext`.
+Qt may need distribution libraries; on Ubuntu/Debian:
 
 ```bash
 sudo apt install libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
 ```
 
-After installation or upgrade:
+### Windows
 
-1. Install/update and enable **TwinText Desktop** from your personal Codex marketplace. Its internal plugin name remains `twintext`. From the Codex CLI, use `codex plugin add twintext@twintext-linux`; substitute your existing personal marketplace name if different.
-2. Restart Codex and review/trust the plugin's **`Stop` hook** when installing it for the first time. Installation does not grant hook trust. Version 0.2 replaces the old `SessionStart` / `UserPromptSubmit` instruction hooks; start a new chat to discard old session instructions. Desktop 0.2.2 keeps the bridge plugin at 0.2.1: its hook command is unchanged, so an already trusted bridge needs no additional review. Restart TwinText to load the updated reader.
-3. Open **TwinText Desktop** from the application menu, or run `~/.local/bin/twintext desktop`.
-4. Choose translation language and bilingual/translation-only mode under **Settings**. The defaults are English and bilingual.
+Install 64-bit Python 3.12 from [python.org](https://www.python.org/downloads/windows/)
+with pip and venv. Open PowerShell in the extracted ZIP folder:
 
-Without trusted hooks, the reader waits for replies; **Paste text** still works. No Codex application files are patched.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+# Optional explicit preferences / model downloads:
+.\scripts\install-windows.ps1 -Workflow chat -DownloadModels
+```
 
-**Upgrading from 0.2.0:** that release's portable `plugin.json` package was ignored for hook discovery by Codex, even with hooks enabled. Version 0.2.1 uses `.codex-plugin/plugin.json` and `.mcp.json`, and the installer removes TwinText's obsolete root manifests. Reinstall/update the plugin, then open **Codex Settings → Hooks** to review its Stop command. The expected command is `python3 "${PLUGIN_ROOT}/hooks/capture.py"`. If no TwinText hook appears, it has not been discovered; restarting or trusting the project alone cannot fix that. See [the upstream loader](https://github.com/openai/codex/blob/main/codex-rs/core-plugins/src/loader.rs) and [reported issue](https://github.com/openai/codex/issues/47925).
+Execution-policy bypass applies only to that process. The installer does not
+change machine policy, registry or PATH. Use `-Python 'C:\path\to\python.exe'`
+if Python cannot be found. Windows downloads are unsigned.
+
+Open **TwinText Desktop** from Start, or `%LOCALAPPDATA%\TwinText\Open TwinText.cmd`.
+For CLI commands use `%LOCALAPPDATA%\TwinText\TwinText.cmd`, for example:
+
+```powershell
+& "$env:LOCALAPPDATA\TwinText\TwinText.cmd" ui --open
+& "$env:LOCALAPPDATA\TwinText\TwinText.cmd" settings --workflow chat --target zh
+```
+
+### Finish setup
+
+1. Install/update **TwinText** from your personal Codex marketplace. Its plugin name
+   is `twintext`; a new marketplace is `twintext-linux` or `twintext-windows`.
+   Existing marketplace names and unrelated entries are preserved.
+2. Restart Codex and review/trust the hooks. Installing a plugin does not grant
+   trust. Chat uses **SessionStart** and **UserPromptSubmit**; Desktop uses **Stop**.
+   Upgrading from the older adapter adds hooks and may require another review.
+3. Choose translation location, target language, display mode and interface language
+   in TwinText settings. Start a new Codex chat after switching locations.
+4. Existing models are preserved. Models are **not downloaded by default**.
+   Open web settings (`twintext ui --open`) and request the language pack, or use
+   `--download-models` / `-DownloadModels`. See the model-license notices first.
+
+The shared compatibility manifest makes all three hooks discoverable, repairing
+0.1's automatic-mode packaging. The old portable root manifest is removed on
+upgrade because the tested Codex loader skipped its hooks. Hook trust remains
+under user control. Automatic Chat replies depend on Codex following the tool
+instructions; Desktop captures completed replies, not partial streams. Neither
+style translates Codex menus or rewrites past messages. Paste works independently.
+These local hook plugins are distributed through GitHub/manual installation,
+not the OpenAI public plugin directory.
+
+## Translation formats and languages
+
+The shared parser translates table headers/cells, visible link labels, headings,
+nested lists, checkboxes, footnote text and quotes. It protects code, paths, email
+addresses, numbers, link destinations and math. The original table is followed
+by its translated table in bilingual mode; translated-only shows one translated
+table. [Format coverage and remaining limits](docs/output-formats.md).
+
+Eight Argos models enable all 20 directions among `en`, `zh`, `ja`, `fr`, `es`.
+Non-English pairs pivot through English and may lose quality. Short or mixed-language
+source detection can be uncertain; choose the source explicitly when necessary.
+Models and dependencies are downloaded from their upstream repositories on request,
+not bundled in release assets. Some legacy model-license statements remain unclear;
+free pricing does not resolve that. See [the exact audit](THIRD_PARTY_NOTICES.md).
+
+Interface language **Automatic** uses the last Codex locale supplied by the
+embedded settings panel, falling back to the system language. Hooks do not supply
+Codex's UI locale. Any of the five languages can be selected manually.
+
+```bash
+twintext ui --open
+twintext desktop --background
+twintext settings --workflow chat --target ja --mode translated --ui-language fr
+twintext settings --workflow desktop --desktop-auto-start false
+twintext models install --starter
+twintext clear-cache
+```
+
+MCP tools include `twintext_translate`, `twintext_status`, `twintext_set_settings`,
+`twintext_settings_ui`, `twintext_open_desktop`, `twintext_install_models` and
+`twintext_clear_cache`. The same translator services Chat, Desktop, CLI and previews.
 
 ## Floating controls
 
@@ -66,78 +144,51 @@ Without trusted hooks, the reader waits for replies; **Paste text** still works.
 
 On GNOME/Wayland, the compositor controls global placement and may ignore always-on-top hints. This version uses a movable companion, not an overlay that tracks the Codex window. If native Wayland ignores pinning and XWayland is available, launch with `QT_QPA_PLATFORM=xcb twintext desktop`. X11 desktop support depends on its window manager too.
 
-## Languages and settings
-
-| Language | Code | Starter models |
-| --- | --- | --- |
-| English | `en` | Default translation target and pivot |
-| Chinese | `zh` | English ↔ Chinese |
-| Japanese | `ja` | English ↔ Japanese |
-| French | `fr` | English ↔ French |
-| Spanish | `es` | English ↔ Spanish |
-
-The eight models enable all 20 directed pairs. Non-English pairs pivot through English and may lose quality. There is no separate Traditional Chinese conversion setting. Local source detection can be uncertain for short or mixed-language replies; choose a source language explicitly when needed.
-
-**Interface language → Automatic** uses the last Codex host locale supplied when you open the embedded TwinText settings panel, falling back to your system language. The hook does not supply Codex's locale. You can select any of the five interface languages manually. Translation language is unaffected.
-
-The embedded/standalone web settings page remains available, including model downloads and cache controls:
-
-```bash
-twintext ui --open
-twintext desktop --background
-twintext settings --target ja --mode translated --ui-language fr
-twintext settings --desktop-auto-start false --always-on-top true
-twintext models list
-twintext models install --starter
-twintext status
-printf '%s\n' 'Bonjour, le programme fonctionne maintenant.' | twintext translate
-```
-
-MCP tools include `twintext_open_desktop`, `twintext_settings_ui`, `twintext_status`, and `twintext_set_settings`. `twintext_translate` remains available for **explicit manual in-chat translation**, which has normal tool/context/output token overhead. The plugin skill no longer instructs Codex to translate each reply.
-
 ## Local data and preservation
 
 - Inference uses installed Argos tokenizers and CPU CTranslate2. There are no inference-time downloads or cloud translation calls. One background worker keeps the UI responsive and ignores stale results when a newer reply or language selection arrives.
 - Code fences, actual indented code, inline code, URLs, reference identifiers, link destinations and recognized file paths remain intact. Table text and visible link labels translate while column separators, alignment and numbers stay intact. Reference definitions, raw HTML blocks, app directives and display math remain unchanged. Protected blocks appear once in bilingual mode.
-- Settings live in `~/.config/twintext/settings.json`; models, translation cache, and desktop data live under `~/.local/share/twintext`, respecting XDG directories. `TWINTEXT_HOME` isolates these for tests.
+- Settings live in `~/.config/twintext/settings.json`; models, translation cache, and desktop data live under `~/.local/share/twintext`, respecting XDG directories. On Windows, settings are under `%APPDATA%\TwinText`, and models/cache/inbox/runtime are under `%LOCALAPPDATA%\TwinText`. `TWINTEXT_HOME` isolates these for tests.
 - The private desktop inbox stores original reply text locally, even if translation caching is disabled. It is bounded to the latest reply from 24 sessions and can be cleared independently. The translator cache can be disabled or cleared from settings.
 - **Retention:** the translation cache is `~/.local/share/twintext/translations.sqlite3`, limited to 10,000 fragments with oldest-used entries evicted as needed. There is no timed expiry. Turning off **Remember translations locally** stops new reads/writes but leaves existing entries; **Clear cache** deletes those entries. The separate inbox is `~/.local/share/twintext/desktop/inbox.sqlite3` and has no timed expiry either: new replies replace the previous reply for that chat, and older sessions are removed above 24. Clearing either store normally completes immediately; SQLite files may remain after their records are cleared. XDG directory overrides and `TWINTEXT_HOME` change these locations.
-- The bridge uses a local SQLite inbox and file lock, with no network listener. The hook fails open, returns `{}`, and never requests another Codex turn. Multiple app launches activate the existing reader.
+- The bridge uses a local SQLite inbox and native Windows/Linux file lock, with no network listener. In Chat mode the Stop hook is inactive, preventing double capture. The hook fails open, returns `{}`, and never requests another Codex turn. Multiple app launches activate the existing reader.
 - Rendered replies do not fetch Markdown images or open links automatically. There is no telemetry or log of reply text.
 
-## Development and validation
+
+## Development and release
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
-.venv/bin/python -m pip install -e '.[engine,desktop,dev]'
+.venv/bin/python -m pip install -e '.[desktop,dev]'
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/ruff check .
-node --check src/twintext/web/app.js
-bash -n scripts/install-linux.sh
-python scripts/check-codex-plugin.py --codex /path/to/codex
-.venv/bin/python scripts/smoke-formats.py /tmp/twintext-formats
+.venv/bin/python scripts/build-release.py --platform linux
+.venv/bin/python scripts/build-release.py --platform windows
 ```
 
-The desktop tests use Qt's offscreen platform and an injected translator. They verify the hook contract, bounded/concurrent capture, stale-result handling, display modes, all interface languages, and unchanged original replies. For a real-model desktop smoke check, first install the starter models, then run:
+CI runs the regression suite on native Windows and Linux with Python 3.10, 3.12
+and 3.13. The release workflow additionally installs from a ZIP, downloads one
+English→Chinese model, checks real table translations in both modes, executes
+native hook commands, renders Qt, and verifies settings/model preservation.
+Only after both operating systems pass does it publish the free preview and
+checksums. Standard public GitHub runners are used; short-lived artifacts avoid
+paid storage. No macOS jobs or paid signing services are configured.
 
-```bash
-.venv/bin/python scripts/smoke-desktop.py /tmp/twintext-desktop.png
-.venv/bin/python scripts/smoke-models.py
-```
-
-See [validation notes](docs/validation.md) and [model sample results](docs/model-smoke.json). These are functional checks, not a human translation-quality assessment. ARM Linux has not been tested. Automatic delivery inside a specific Codex desktop build must be verified after the user trusts its hook.
+Read [validation notes](docs/validation.md) and [release limitations](docs/release-0.3.0.md).
+Desktop movement, hook trust and automatic Chat tool use still require testing in
+actual user sessions; CI does not simulate an entire Codex conversation.
 
 ## Remove
 
-Disable/uninstall `twintext` in Codex and quit TwinText Desktop. Remove only its marketplace entry, app directory, `~/.local/bin/twintext` symlink, and `~/.local/share/applications/twintext.desktop` entry if desired. Settings are separate under `~/.config/twintext`.
+Disable/uninstall TwinText in Codex and quit its window. Remove its marketplace
+entry and runtime directory, plus the TwinText application-menu/Start shortcut.
+On Linux also remove the owned `~/.local/bin/twintext` link. Settings/cache/models
+are separate; keep them to retain preferences or remove the documented directories
+to delete local records. Do not remove unrelated marketplace entries.
 
-## License and references
+## License
 
-MIT licensed; independent of OpenAI and Immersive Translate. Model assets and dependencies retain their own licenses and are downloaded from the official Argos index rather than redistributed here. Qt for Python is a separately licensed dependency; see [its licensing documentation](https://doc.qt.io/qtforpython-6/licenses.html).
-
-- [Argos Translate](https://github.com/argosopentech/argos-translate)
-- [Codex hooks](https://learn.chatgpt.com/docs/hooks)
-- [Codex plugin packaging](https://developers.openai.com/plugins/build/plugins)
-- [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview)
-- [Codex Bilingual Overlay](https://github.com/mgjc22962/codex-bilingual-overlay), a Windows display-only architecture reference; TwinText implements its own Linux companion and hook bridge.
+TwinText source is [MIT licensed](LICENSE), independent of OpenAI and Immersive
+Translate. Runtime dependencies and language assets retain their own licenses;
+see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The releases contain no payment
+system and no bundled third-party model weights or runtime binaries.

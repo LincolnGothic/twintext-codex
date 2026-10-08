@@ -1,7 +1,7 @@
 {
   "name": "twintext",
-  "version": "0.2.1",
-  "description": "Offline floating translation companion for Codex on Linux.",
+  "version": "0.3.0",
+  "description": "Offline Chat and Desktop translation for Codex on Windows and Linux.",
   "author": {
     "name": "LincolnGothic"
   },
@@ -12,15 +12,16 @@
     "bilingual",
     "offline",
     "linux",
-    "codex"
+    "codex",
+    "windows"
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "hooks": "./hooks/hooks.json",
   "interface": {
-    "displayName": "TwinText Desktop",
-    "shortDescription": "Read replies in a floating window, offline",
-    "longDescription": "Display completed Codex replies in a separate local floating window. Choose bilingual, translated-only, or original display, plus independent translation and interface languages.",
+    "displayName": "TwinText",
+    "shortDescription": "Offline translations in chat or a floating window",
+    "longDescription": "Choose in-chat or floating-window translations, bilingual or translated-only, with independent translation and interface languages.",
     "developerName": "LincolnGothic",
     "category": "Productivity",
     "capabilities": [

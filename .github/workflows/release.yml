@@ -1,0 +1,79 @@
+name: Windows and Linux release
+on:
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+      - .github/workflows/release.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
+      - run: python -m pip install -e '.[dev,desktop]'
+      - run: python -m unittest discover -s tests -v
+      - run: ruff check .
+      - run: node --check src/twintext/web/app.js
+      - name: Package both styles
+        run: python scripts/build-release.py --platform ${{ matrix.platform }}
+      - name: Install from release archive and smoke test
+        run: python scripts/smoke-install.py --platform ${{ matrix.platform }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.platform }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS-*.txt
+          retention-days: 1
+  publish:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publish free preview after both operating systems pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          task_version=$(python -c 'import re,pathlib; print(re.search(r"^version = \"([^\"]+)\"", pathlib.Path("pyproject.toml").read_text(), re.M)[1])')
+          if gh release view "v${task_version}" >/dev/null 2>&1; then
+            printf 'Release already exists; bump the version for another release.\n'
+            exit 0
+          fi
+          gh release create "v${task_version}" dist/*.zip dist/SHA256SUMS-*.txt \
+            --target "${GITHUB_SHA}" --title "TwinText ${task_version} — Windows and Linux preview" \
+            --notes-file "docs/release-${task_version}.md" --prerelease

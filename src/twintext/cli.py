@@ -7,7 +7,14 @@ from pathlib import Path
 
 from twintext import __version__
 from twintext.cache import Cache
-from twintext.config import LANGUAGES, MODES, TwinTextError, load_settings, update_settings
+from twintext.config import (
+    LANGUAGES,
+    MODES,
+    WORKFLOWS,
+    TwinTextError,
+    load_settings,
+    update_settings,
+)
 from twintext.engine import STARTER_PAIRS, ArgosEngine
 from twintext.service import Service, context
 
@@ -24,6 +31,7 @@ def parser():
     translate.add_argument("--json", action="store_true")
     settings = commands.add_parser("settings", help="Read or save settings")
     settings.add_argument("--source", choices=["auto", *LANGUAGES])
+    settings.add_argument("--workflow", choices=WORKFLOWS)
     settings.add_argument("--target", choices=list(LANGUAGES))
     settings.add_argument("--mode", choices=MODES)
     settings.add_argument("--ui-language", choices=["auto", *LANGUAGES])
@@ -41,7 +49,7 @@ def parser():
     install.add_argument("--target", choices=list(LANGUAGES))
     commands.add_parser("clear-cache", help="Remove cached translations")
     commands.add_parser("mcp", help="Serve local MCP over stdio")
-    commands.add_parser("context", help="Compatibility command; no model context is emitted")
+    commands.add_parser("context", help="Emit instructions only when Chat workflow is selected")
     commands.add_parser("capture", help="Receive a Codex Stop event on stdin (no model calls)")
     desktop = commands.add_parser("desktop", help="Open the floating desktop reader")
     desktop.add_argument("--background", action="store_true", help="Start as a compact button")
@@ -52,6 +60,11 @@ def parser():
 
 
 def main(argv=None):
+    # Windows redirected streams otherwise inherit a legacy code page. MCP and
+    # hook pipes are UTF-8; keep the five supported languages intact everywhere.
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     args = parser().parse_args(argv)
     try:
         if args.command == "mcp":
@@ -90,6 +103,7 @@ def main(argv=None):
                 key: getattr(args, key)
                 for key in (
                     "source",
+                    "workflow",
                     "target",
                     "mode",
                     "ui_language",

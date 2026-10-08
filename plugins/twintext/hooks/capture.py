@@ -9,8 +9,12 @@ try:
     if len(raw) <= 1_100_000:
         runner = Path(__file__).resolve().parents[1] / "scripts/launch.py"
         subprocess.run(
-            [sys.executable, str(runner), "capture"], input=raw,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=8, check=False,
+            [sys.executable, str(runner), "capture"],
+            input=raw,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=8,
+            check=False,
         )
 except (OSError, subprocess.TimeoutExpired):
     pass

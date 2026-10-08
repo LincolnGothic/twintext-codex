@@ -3,7 +3,6 @@
 No model calls, transcript edits, network listeners, or translated hook output.
 """
 
-import fcntl
 import importlib.util
 import json
 import os
@@ -12,8 +11,10 @@ import subprocess
 import sys
 import time
 from contextlib import contextmanager
+from pathlib import Path
 
 from twintext.config import TwinTextError, data_dir, load_settings, private_dir
+from twintext.locking import acquire_lock
 from twintext.service import MAX_TEXT_LENGTH
 
 MAX_SESSIONS = 24
@@ -94,13 +95,7 @@ class Inbox:
 
 def desktop_lock():
     path = private_dir(data_dir() / "desktop") / "window.lock"
-    lock = path.open("a", encoding="utf-8")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        lock.close()
-        return None
-    return lock  # Keep this descriptor open for the lifetime of QApplication.
+    return acquire_lock(path, blocking=False)
 
 
 def desktop_running():
@@ -116,7 +111,11 @@ def launch_desktop(background=False):
         if not background:
             Inbox().activate()
         return {"running": True, "started": False}
-    if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+    if (
+        sys.platform != "win32"
+        and not os.environ.get("DISPLAY")
+        and not os.environ.get("WAYLAND_DISPLAY")
+    ):
         raise TwinTextError("Open TwinText Desktop inside your Linux graphical session.")
     if importlib.util.find_spec("PySide6") is None:
         raise TwinTextError("Install TwinText's desktop extra or rerun scripts/install-linux.sh.")
@@ -126,7 +125,12 @@ def launch_desktop(background=False):
         log.unlink()
     with log.open("a", encoding="utf-8") as errors:
         log.chmod(0o600)
-        command = [sys.executable, "-m", "twintext.cli", "desktop"]
+        interpreter = sys.executable
+        if sys.platform == "win32":
+            windowless = str(Path(interpreter).with_name("pythonw.exe"))
+            if Path(windowless).exists():
+                interpreter = windowless
+        command = [interpreter, "-m", "twintext.cli", "desktop"]
         if background:
             command.append("--background")
         process = subprocess.Popen(
@@ -147,6 +151,8 @@ def capture(stream):
             return
         payload = json.loads(raw)
         settings = load_settings()
+        if settings.workflow != "desktop":
+            return
         if settings.enabled and Inbox().publish(payload) and settings.desktop_auto_start:
             launch_desktop(background=True)
     except (TwinTextError, OSError, ValueError, TypeError, sqlite3.Error):

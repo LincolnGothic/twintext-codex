@@ -59,7 +59,10 @@ class CoreTests(unittest.TestCase):
         with self.assertRaises(TwinTextError):
             update_settings(enabled="true")
         self.assertEqual(load_settings().target, "zh")
-        self.assertEqual(Path(self.directory.name, "settings.json").stat().st_mode & 0o777, 0o600)
+        if os.name != "nt":
+            self.assertEqual(
+                Path(self.directory.name, "settings.json").stat().st_mode & 0o777, 0o600
+            )
 
     def test_corrupt_settings_fail_explicitly(self):
         Path(self.directory.name, "settings.json").write_text("[]")

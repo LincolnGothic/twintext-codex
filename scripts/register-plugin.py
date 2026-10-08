@@ -20,13 +20,13 @@ if marketplace.exists():
         sys.exit("Existing marketplace has an unexpected format; it was not changed.")
 else:
     value = {
-        "name": "twintext-linux",
-        "interface": {"displayName": "TwinText Linux"},
+        "name": "twintext-windows" if sys.platform == "win32" else "twintext-linux",
+        "interface": {"displayName": "TwinText"},
         "plugins": [],
     }
 entry = {
     "name": "twintext",
-    "source": {"source": "local", "path": "./" + str(relative)},
+    "source": {"source": "local", "path": "./" + relative.as_posix()},
     "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
     "category": "Productivity",
 }

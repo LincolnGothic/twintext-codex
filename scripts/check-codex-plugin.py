@@ -47,7 +47,7 @@ def main():
                 "id": 1,
                 "method": "initialize",
                 "params": {
-                    "clientInfo": {"name": "twintext_package_check", "version": "0.2.1"},
+                    "clientInfo": {"name": "twintext_package_check", "version": "0.3.0"},
                     "capabilities": {"experimentalApi": True},
                 },
             }
@@ -79,11 +79,12 @@ def main():
             else:
                 plugin = message["result"]["plugin"]
                 hooks = plugin["hooks"]
-                if len(hooks) != 1 or hooks[0].get("eventName", "").lower() != "stop":
-                    raise RuntimeError(f"Expected one Stop hook, found: {hooks}")
+                events = sorted(hook.get("eventName", "").lower() for hook in hooks)
+                if events != ["sessionstart", "stop", "userpromptsubmit"]:
+                    raise RuntimeError(f"Expected Chat and Desktop hooks, found: {hooks}")
                 if "twintext" not in plugin["mcpServers"]:
                     raise RuntimeError("Codex did not discover the TwinText MCP server.")
-                print(json.dumps({"hook": hooks[0], "mcpServers": plugin["mcpServers"]}))
+                print(json.dumps({"hooks": hooks, "mcpServers": plugin["mcpServers"]}))
                 return
         raise RuntimeError("Timed out checking Codex plugin discovery.")
     finally:

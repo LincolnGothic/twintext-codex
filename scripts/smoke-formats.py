@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix="twintext-formats-") as directory:
             )
             assert "项目" in plain or "物品" in plain
             assert window.grab().save(str(output / f"{mode}.png"))
-        window.preferences.show()
+        window.preference_scroll.show()
         app.processEvents()
         assert window.grab().save(str(output / "settings.png"))
         window.collapse()

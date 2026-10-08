@@ -122,5 +122,22 @@ class Service:
 
 
 def context():
-    # Compatibility with v0.1 launchers; automatic translation now uses Stop + desktop.
-    return ""
+    settings = load_settings()
+    if settings.workflow != "chat":
+        return ""
+    if not settings.enabled or settings.mode == "original":
+        return (
+            "TwinText Chat translation is paused. Stop applying earlier TwinText translation "
+            "instructions; present new replies normally. Explicit user requests take precedence."
+        )
+    return (
+        f"TwinText Chat is enabled. Translate new final replies into {LANGUAGES[settings.target]} "
+        f"({settings.target}), using {settings.mode} display. Compose your complete reply "
+        "in the conversation's normal source language, "
+        "call the local twintext_translate tool with that Markdown, and present its display "
+        "verbatim. This local translation workflow uses ordinary Codex tool/context/output "
+        "tokens. Preserve code, paths and links. Do not translate tool results repeatedly. "
+        "If translation fails, show the original reply and explain briefly. Do not substitute "
+        "a cloud translation service. These settings apply to new final replies only. "
+        "Explicit language or display instructions from the user take precedence."
+    )
