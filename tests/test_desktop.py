@@ -17,7 +17,7 @@ from test_markdown_formats import TABLE  # noqa: E402
 from twintext.bridge import Inbox  # noqa: E402
 from twintext.cache import Cache  # noqa: E402
 from twintext.config import LANGUAGES, load_settings, update_settings  # noqa: E402
-from twintext.desktop import WORDS, Companion  # noqa: E402
+from twintext.desktop import WORDS, Companion, run  # noqa: E402
 from twintext.service import Service  # noqa: E402
 
 
@@ -155,6 +155,56 @@ class DesktopTests(unittest.TestCase):
         self.assertFalse(self.window.orb.isVisible())
         self.assertTrue(self.window.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
         self.assertIsNone(self.window.reader.loadResource(2, "https://example.com/image.png"))
+
+    def test_close_exits_reader_and_keeps_automatic_reopening_enabled(self):
+        update_settings(desktop_auto_start=True)
+        self.window.poll()
+        self.window.show()
+        with patch.object(self.app, "quit") as quit_app:
+            self.assertTrue(self.window.close())
+            quit_app.assert_called_once_with()
+        self.assertFalse(self.window.isVisible())
+        self.assertFalse(self.window.orb.isVisible())
+        self.assertTrue(load_settings().desktop_auto_start)
+
+    def test_compact_quit_hides_both_windows_without_changing_preferences(self):
+        saved = update_settings(desktop_auto_start=True)
+        self.window.poll()
+        self.window.collapse()
+        self.window.timer.start(300)
+        self.assertTrue(self.window.timer.isActive())
+        self.app.processEvents()
+        with patch.object(self.app, "quit") as quit_app:
+            self.assertTrue(hasattr(self.window, "orb_quit_button"))
+            self.window.orb_quit_button.click()
+            quit_app.assert_called_once_with()
+        self.assertFalse(self.window.orb.isVisible())
+        self.assertFalse(self.window.isVisible())
+        self.assertFalse(self.window.timer.isActive())
+        self.assertEqual(load_settings(), saved)
+
+    def test_native_compact_close_exits_application(self):
+        self.window.collapse()
+        self.app.processEvents()
+        with patch.object(self.app, "quit") as quit_app:
+            self.assertTrue(self.window.orb.close())
+            quit_app.assert_called_once_with()
+        self.assertFalse(self.window.orb.isVisible())
+        self.assertFalse(self.window.isVisible())
+
+    def test_shutdown_hides_windows_before_releasing_singleton_lock(self):
+        def release():
+            self.assertFalse(self.window.isVisible())
+            self.assertFalse(self.window.orb.isVisible())
+
+        with (
+            patch("twintext.desktop.desktop_lock") as acquire,
+            patch("twintext.desktop.Companion", return_value=self.window),
+            patch.object(self.app, "exec", return_value=0),
+        ):
+            acquire.return_value.close.side_effect = release
+            self.assertEqual(run(background=True), 0)
+            acquire.return_value.close.assert_called_once_with()
 
     def test_table_renders_and_copy_modes_preserve_rows_and_numbers(self):
         self.inbox.publish(payload(text=TABLE))
