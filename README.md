@@ -9,7 +9,7 @@ TwinText interface language independently, or let Automatic follow the available
 host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 
-[Download 0.3.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.3.0) ·
+[Download 0.4.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.4.0) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
@@ -21,7 +21,7 @@ Microsoft Azure Translator is an optional provider using your own credentials.
 | **Desktop** | Completed replies in a separate floating window, with a compact draggable button | Automatic translation makes no additional LLM requests and returns no translations to model context |
 
 Chat preserves the original **0.1** experience; Desktop preserves the **0.2.2**
-experience. Version **0.3.0** maintains both through a shared translation engine,
+experience. Version **0.4.0** maintains both through a shared translation engine,
 Markdown parser, language packs and settings. The old releases are historical
 versions; new fixes apply to both styles in the current version.
 
@@ -43,8 +43,8 @@ Choose your operating system and preferred first-install style:
 
 | Operating system | Chat default | Floating-window default | Checksums |
 | --- | --- | --- | --- |
-| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.3.0/TwinText-0.3.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.3.0/TwinText-0.3.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.3.0/SHA256SUMS-linux.txt) |
-| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.3.0/TwinText-0.3.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.3.0/TwinText-0.3.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.3.0/SHA256SUMS-windows.txt) |
+| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.4.0/TwinText-0.4.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.4.0/TwinText-0.4.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.4.0/SHA256SUMS-linux.txt) |
+| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.4.0/TwinText-0.4.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.4.0/TwinText-0.4.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.4.0/SHA256SUMS-windows.txt) |
 
 Each ZIP supports **both** styles. Install one package, then switch in settings.
 Check its SHA-256 hash against the matching checksum file before installation.
@@ -265,14 +265,14 @@ On Windows, use `.venv\Scripts\python.exe` and `.venv\Scripts\ruff.exe`; set
 `$env:QT_QPA_PLATFORM = 'offscreen'` before the Qt tests. The development install
 above omits the optional engine; add the `engine` extra for real-model work.
 
-For 0.3.0, **72 regression tests passed** on Windows and Linux with Python 3.10,
-3.12 and 3.13. Both operating systems also passed installation from a ZIP, native
-hook execution, a real English→Chinese table translation in both modes, Qt rendering,
-and preservation of settings/models on upgrade. [Validation evidence](docs/validation.md).
+Version 0.4.0 includes **93 regression tests** for Windows and Linux with Python
+3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
+native hooks, real Offline English→Chinese tables, Qt rendering and preservation
+of settings/models on upgrade. [Release notes](docs/release-0.4.0.md).
 Interactive Codex sessions, hook trust and compositor behavior still require host testing.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.3.0.md). Report bugs with your OS, Python/Codex/
+and [release notes](docs/release-0.4.0.md). Report bugs with your OS, Python/Codex/
 TwinText versions, style, language pair and a sanitized Markdown example; avoid
 posting private conversations or local databases.
 

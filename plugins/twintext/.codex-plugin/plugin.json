@@ -1,7 +1,7 @@
 {
   "name": "twintext",
-  "version": "0.3.0",
-  "description": "Offline Chat and Desktop translation for Codex on Windows and Linux.",
+  "version": "0.4.0",
+  "description": "Offline and optional Azure Chat/Desktop translation for Codex on Windows and Linux.",
   "author": {
     "name": "LincolnGothic"
   },
@@ -20,7 +20,7 @@
   "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "TwinText",
-    "shortDescription": "Offline translations in chat or a floating window",
+    "shortDescription": "Offline or Azure translation in chat or a floating window",
     "longDescription": "Choose in-chat or floating-window translations, bilingual or translated-only, with independent translation and interface languages.",
     "developerName": "LincolnGothic",
     "category": "Productivity",
