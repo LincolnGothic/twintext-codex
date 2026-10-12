@@ -33,7 +33,12 @@ class Service:
             self._provider = provider
         return self._engine
 
-    def translate(self, text, source=None, target=None, mode=None):
+    def translate(self, text, source=None, target=None, mode=None, cancel=None):
+        def check_cancel():
+            if cancel is not None and cancel.is_set():
+                raise TwinTextError("Translation cancelled.")
+
+        check_cancel()
         if not isinstance(text, str):
             raise TwinTextError("Text must be a string.")
         if len(text) > MAX_TEXT_LENGTH:
@@ -71,12 +76,18 @@ class Service:
 
         def translate_fragment(fragment):
             nonlocal cache_hits
+            check_cancel()
             key = Cache.key(fragment, source, settings.target, fingerprint)
             value = cache.get(key) if cache else None
             if value is not None:
                 cache_hits += 1
                 return value
-            value = engine.translate(fragment, source, settings.target)
+            value = (
+                engine.translate(fragment, source, settings.target, cancel=cancel)
+                if cancel is not None and getattr(engine, "provider", "offline") != "offline"
+                else engine.translate(fragment, source, settings.target)
+            )
+            check_cancel()
             if not isinstance(value, str) or not value.strip():
                 raise TwinTextError("The local model returned an empty translation.")
             if cache:
@@ -93,6 +104,7 @@ class Service:
 
         references = reference_ids(text)
         for block in blocks(text):
+            check_cancel()
             value = (
                 translate_block(
                     block.original, translate_fragment, block.kind, references, translate_header
@@ -170,7 +182,10 @@ def context():
         f"({settings.target}), using {settings.mode} display. Compose your complete reply "
         "in the conversation's normal source language, "
         "call the local twintext_translate tool with that Markdown, and present its display "
-        "verbatim. This local translation workflow uses ordinary Codex tool/context/output "
+        f"verbatim. Active provider: {settings.provider}. "
+        + ("Azure sends source text to Microsoft Azure Translator. "
+           if settings.provider == "azure" else "Offline translation stays on this computer. ")
+        + "This translation workflow uses ordinary Codex tool/context/output "
         "tokens. Preserve code, paths and links. Do not translate tool results repeatedly. "
         "If translation fails, show the original reply and explain briefly. Do not substitute "
         "another translation provider. These settings apply to new final replies only. "

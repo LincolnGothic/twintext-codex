@@ -6,7 +6,8 @@ by Argos Translate and CTranslate2 on your computer.
 
 Choose **English, Chinese, Japanese, French or Spanish** for translation. Set the
 TwinText interface language independently, or let Automatic follow the available
-host/system language. Translation runs offline after setup and model downloads.
+host/system language. Offline (the default) runs locally after model downloads.
+Microsoft Azure Translator is an optional provider using your own credentials.
 
 [Download 0.3.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.3.0) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
@@ -173,7 +174,8 @@ The floating reader does not track or overlay the Codex window automatically.
 
 ## Costs and privacy
 
-TwinText has **no purchase price, subscription, translation API key or API fee**.
+TwinText has **no purchase price or subscription**. Offline translation requires
+no API key or translation API fee. Azure has separate Microsoft quotas/pricing.
 Argos/CTranslate2 inference runs on your CPU after models are installed. Setup and
 model downloads use internet access and disk space; reading translations uses local
 CPU/RAM. Ordinary Codex access and usage remain subject to your existing plan.
@@ -184,12 +186,49 @@ claimed negligible. Desktop's automatic capture and translation make no addition
 LLM requests or translated-context additions. Asking Codex to open, configure or
 manually translate with TwinText still uses normal Codex tokens in either style.
 
-TwinText has no telemetry, background clipboard monitoring, OCR or cloud translation
-fallback. Desktop keeps captured original replies on disk locally. In Chat mode,
+TwinText has no telemetry, background clipboard monitoring, OCR or automatic provider
+fallback. Azure sends source text to Microsoft Azure Translator; screenshots are
+never sent to Azure. Desktop keeps original replies on disk locally. In Chat mode,
 original/translated text enters the Codex conversation; offline inference does not
 make the Codex chat itself offline. Rendered Markdown images are not fetched and
 links are not opened automatically. Codex menus, screenshots, PDFs and videos are
 outside this release's translation scope.
+
+### Azure configuration and credentials
+
+1. Create your own Microsoft Azure Translator resource and obtain its resource key
+   and region. No developer-owned shared API key is bundled.
+2. Run `twintext azure-configure` in your local terminal, or use **Configure Azure
+   credentials** in the floating reader's settings. The local prompt masks the key.
+   Never paste a key into Codex, MCP tool arguments or the web settings page.
+3. Explicitly select **Microsoft Azure Translator** in settings, or run
+   `twintext settings --provider azure`. Existing installations remain Offline.
+   `twintext settings --provider offline` returns to local translation.
+
+Azure uses the [Translator REST v3 API](https://learn.microsoft.com/en-us/azure/ai-services/translator/text-translation/reference/v3/translate)
+directly, with the fixed global HTTPS endpoint and optional resource region.
+Custom/VNet endpoints and Entra ID authentication are not supported. Azure usage
+is subject to Microsoft's [current quotas](https://learn.microsoft.com/en-us/azure/ai-services/translator/service-limits)
+and [pricing](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/translator/).
+Azure is **not guaranteed permanently free**. Azure errors never trigger fallback.
+
+Windows stores credentials in the current user's **Windows Credential Manager**,
+under a TwinText/Azure entry specific to the configuration directory. Linux uses
+`~/.config/twintext/private/azure-credentials.json`, directory mode `700`, file
+mode `600` (or `TWINTEXT_HOME/private`). Files must belong to the current user;
+links and permissive modes are refused. This portable backend avoids a dependency
+on desktop keyring services; Linux files are **not encrypted at rest**. Protect
+the account, disk and backups. Credentials never enter `settings.json`, caches or
+status; the Codex/MCP/web UI receives only configured/not configured status.
+
+`twintext status`, native Azure settings and the web Azure card display
+`This month: 127 requests · 143,820 characters`. Local `cloud-usage.json` stores
+only the calendar month, submitted cloud request count and source character count.
+Failed submissions count; cache hits/local translation do not. Long fragments are
+split into bounded requests. Counters count Unicode code points and roll over
+with the local month; they are estimates, not billing records. No counter or
+telemetry is sent anywhere. Optional translation caching still stores translation
+text locally, separately from this metadata-only counter.
 
 ### Local records
 

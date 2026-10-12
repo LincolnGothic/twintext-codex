@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
+    QLineEdit,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -28,12 +30,15 @@ from twintext.cache import Cache
 from twintext.config import (
     LANGUAGES,
     MODES,
+    PROVIDERS,
     WORKFLOWS,
     TwinTextError,
     load_settings,
     update_settings,
 )
+from twintext.credentials import load_credentials, save_credentials
 from twintext.service import Service
+from twintext.usage import CloudUsage, usage_label
 
 WORDS = {
     "en": {
@@ -304,21 +309,27 @@ class Translator:
         self.service = service or Service()
         self.jobs = queue.Queue(maxsize=1)
         self.results = queue.SimpleQueue()
+        self.cancelled = threading.Event()
         threading.Thread(target=self.run, daemon=True, name="twintext-model").start()
 
     def submit(self, revision, text, source, target):
+        self.cancelled.set()
+        self.cancelled = threading.Event()
         try:
             self.jobs.get_nowait()
         except queue.Empty:
             pass
-        self.jobs.put_nowait((revision, text, source, target))
+        self.jobs.put_nowait((revision, text, source, target, self.cancelled))
+
+    def cancel(self):
+        self.cancelled.set()
 
     def run(self):
         while True:
-            revision, text, source, target = self.jobs.get()
+            revision, text, source, target, cancelled = self.jobs.get()
             try:
                 result = self.service.translate(
-                    text, source=source, target=target, mode="translated"
+                    text, source=source, target=target, mode="translated", cancel=cancelled
                 )
                 self.results.put((revision, result, None))
             except Exception as exc:
@@ -429,12 +440,18 @@ class Companion(QWidget):
         form = QFormLayout(self.preferences)
         self.selects = {}
         self.labels = {}
-        for key in ("workflow", "source", "target", "mode", "ui"):
+        for key in ("provider", "workflow", "source", "target", "mode", "ui"):
             label = QLabel()
             combo = QComboBox()
             self.labels[key] = label
             self.selects[key] = combo
             form.addRow(label, combo)
+        self.azure_button = QPushButton("Configure Azure credentials…")
+        self.azure_button.clicked.connect(self.configure_azure)
+        form.addRow(self.azure_button)
+        self.azure_status = QLabel()
+        self.azure_status.setWordWrap(True)
+        form.addRow(self.azure_status)
         self.checks = {}
         for key in ("enabled", "cache", "start", "pin"):
             box = QCheckBox()
@@ -550,7 +567,22 @@ class Companion(QWidget):
             (self.quit_button, "quit"),
         ):
             button.setText(self.t(key))
-        self.offline.setText(self.t("offline"))
+        self.offline.setText(
+            self.t("offline") if self.settings.provider == "offline"
+            else "Azure — source text is sent to Microsoft; screenshots are not sent."
+        )
+        azure = self.settings.provider == "azure"
+        self.azure_button.setVisible(azure)
+        self.azure_status.setVisible(azure)
+        if azure:
+            try:
+                configured = bool(load_credentials().get("key"))
+                self.azure_status.setText(
+                    ("Credentials configured" if configured else "Credentials not configured")
+                    + "\n" + usage_label(CloudUsage().snapshot())
+                )
+            except TwinTextError as exc:
+                self.azure_status.setText(str(exc))
         self.locale_hint.setText(self.t("locale_hint"))
         self.editor.setPlaceholderText(self.t("placeholder"))
         self.collapse_button.setToolTip(self.t("collapse"))
@@ -563,15 +595,17 @@ class Companion(QWidget):
         for key, combo in self.selects.items():
             combo.blockSignals(True)
             combo.clear()
-            codes = WORKFLOWS if key == "workflow" else MODES if key == "mode" else list(LANGUAGES)
+            codes = (PROVIDERS if key == "provider" else WORKFLOWS if key == "workflow"
+                     else MODES if key == "mode" else list(LANGUAGES))
             if key in ("source", "ui"):
                 codes = ["auto", *codes]
             for code in codes:
-                combo.addItem(self.t(code), code)
+                label = ("Offline — Argos" if code == "offline" else "Microsoft Azure Translator")
+                combo.addItem(label if key == "provider" else self.t(code), code)
             field = "ui_language" if key == "ui" else key
             combo.setCurrentIndex(combo.findData(getattr(self.settings, field)))
             combo.blockSignals(False)
-            self.labels[key].setText(self.t(key))
+            self.labels[key].setText("Translation provider" if key == "provider" else self.t(key))
         for key, box in self.checks.items():
             field = {"start": "desktop_auto_start", "pin": "always_on_top"}.get(key, key)
             box.blockSignals(True)
@@ -584,11 +618,18 @@ class Companion(QWidget):
 
     def update_status(self):
         self.status.setText(self.t(self.status_key))
+        if self.settings.provider == "azure":
+            try:
+                self.azure_status.setText(self.azure_status.text().split("\n")[0]
+                                          + "\n" + usage_label(CloudUsage().snapshot()))
+            except TwinTextError as exc:
+                self.azure_status.setText(str(exc))
 
     def save_preferences(self):
         previous = self.settings
         try:
             self.settings = update_settings(
+                provider=self.selects["provider"].currentData(),
                 workflow=self.selects["workflow"].currentData(),
                 source=self.selects["source"].currentData(),
                 target=self.selects["target"].currentData(),
@@ -607,20 +648,39 @@ class Companion(QWidget):
         self.localize()
         if previous.always_on_top != self.settings.always_on_top:
             self.apply_pin()
-        if (previous.source, previous.target, previous.cache) != (
+        if (previous.source, previous.target, previous.cache, previous.provider) != (
             self.settings.source,
             self.settings.target,
             self.settings.cache,
+            self.settings.provider,
         ):
             self.translate_current()
         elif previous.mode != self.settings.mode:
             if self.settings.mode == "original":
                 self.revision += 1
+                self.cancel_translation()
                 self.reader.setMarkdown(self.text)
             elif self.last_result:
                 self.render_result()
             else:
                 self.translate_current()
+
+    def configure_azure(self):
+        region, accepted = QInputDialog.getText(
+            self, "Azure credentials", "Resource region (blank for global resources):"
+        )
+        if not accepted:
+            return
+        key, accepted = QInputDialog.getText(
+            self, "Azure credentials", "Your Azure resource key:", QLineEdit.EchoMode.Password
+        )
+        if not accepted:
+            return
+        try:
+            save_credentials(key, region.strip())
+            self.localize()
+        except TwinTextError as exc:
+            self.azure_status.setText(str(exc))
 
     def apply_pin(self):
         for window in (self, self.orb):
@@ -675,6 +735,7 @@ class Companion(QWidget):
 
     def translate_current(self):
         self.revision += 1
+        self.cancel_translation()
         self.last_result = None
         self.copy_button.setEnabled(bool(self.text))
         self.reader.setMarkdown(self.text or self.t("empty"))
@@ -687,6 +748,11 @@ class Companion(QWidget):
             self.status_key = "ready" if self.text else "waiting"
         self.update_status()
 
+    def cancel_translation(self):
+        cancel = getattr(self.translator, "cancel", None)
+        if cancel is not None:
+            cancel()
+
     def render_result(self):
         self.reader.setMarkdown(display_text(self.last_result, self.settings.mode))
 
@@ -697,6 +763,7 @@ class Companion(QWidget):
     def clear(self):
         self.inbox.clear()
         self.revision += 1
+        self.cancel_translation()
         self.text = ""
         self.last_result = None
         self.rows = []

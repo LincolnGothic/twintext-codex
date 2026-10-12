@@ -109,3 +109,14 @@ pair, display mode, whether Paste/Translate works and a small sanitized Markdown
 example. Describe expected and actual behavior. Avoid posting private replies,
 credentials or your local databases. Formatting coverage is documented
 [here](output-formats.md); model quality is separate from formatting correctness.
+
+## Azure provider
+
+Select Azure explicitly after configuring your own credentials with
+`twintext azure-configure` or native desktop settings. The embedded panel only
+reports configured status and never accepts or reveals a key. For 401 check key
+and region; for 403 check access/region/quota; for 429 wait and check Microsoft
+quota/pricing. For timeout/network errors check connectivity and try shorter text.
+No automatic provider fallback occurs. Offline remains local; screenshots are
+never sent to Azure. Linux credentials need owner-only directory/file permissions
+700/600; protect this unencrypted file and backups. See README for setup/privacy.

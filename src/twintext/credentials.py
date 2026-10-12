@@ -100,8 +100,10 @@ def load_credentials():
                         "Azure credentials need owner-only permissions (chmod 600)."
                     )
                 value = json.loads(stream.read(8192))
-        if not isinstance(value, dict) or not isinstance(value.get("key", ""), str):
+        if not isinstance(value, dict):
             raise ValueError
+        if value:
+            _validate(value.get("key"), value.get("region", ""))
         return value
     except FileNotFoundError:
         return {}
@@ -111,11 +113,15 @@ def load_credentials():
         ) from None
 
 
-def save_credentials(key, region=""):
-    if not isinstance(key, str) or not key.strip() or len(key) > 2048 or "\n" in key or "\r" in key:
+def _validate(key, region):
+    if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9+/_=-]{1,2048}", key.strip()):
         raise TwinTextError("Enter a valid Azure resource key.")
-    if not isinstance(region, str) or not re.fullmatch(r"[a-z0-9-]*", region):
+    if not isinstance(region, str) or not re.fullmatch(r"[a-z0-9-]{0,128}", region):
         raise TwinTextError("Enter the Azure resource region, for example westus.")
+
+
+def save_credentials(key, region=""):
+    _validate(key, region)
     value = {"key": key.strip(), "region": region}
     try:
         if sys.platform == "win32":

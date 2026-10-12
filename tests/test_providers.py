@@ -6,7 +6,7 @@ import threading
 import unittest
 from datetime import date
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from urllib.error import HTTPError, URLError
 
 from test_core import FakeEngine
@@ -166,6 +166,66 @@ class ProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(TwinTextError, "cancelled"):
             self.engine(cancel=cancelled).translate("Hello", "en", "fr", cancel=cancelled)
 
+    def test_service_cancellation_does_not_cache_or_continue_fragments(self):
+        cancelled = threading.Event()
+        update_settings(source="en", target="fr", provider="azure")
+        service = Service(self.engine(cancel=cancelled))
+        with self.assertRaisesRegex(TwinTextError, "cancelled"):
+            service.translate("First paragraph.\n\nSecond paragraph.", cancel=cancelled)
+        self.assertEqual(len(self.sent), 1)
+        cancelled.clear()
+        service = Service(self.engine())
+        self.assertEqual(service.translate("First paragraph.")["cache_hits"], 0)
+
+    def test_wrapped_timeout_and_invalid_stored_headers_are_sanitized(self):
+        with self.assertRaisesRegex(TwinTextError, "timed out"):
+            self.engine(error=URLError(TimeoutError("fixture-secret"))).translate(
+                "Hello", "en", "fr"
+            )
+        from twintext.credentials import save_credentials
+
+        for key, region in [("fixture-secret\r\nInjected: bad", "westus"),
+                            ("fixture-secret", "westus\r\nInjected: bad")]:
+            with self.assertRaises(TwinTextError) as error:
+                save_credentials(key, region)
+            self.assertNotIn("fixture-secret", str(error.exception))
+
+    def test_windows_credential_manager_backend_without_real_credentials(self):
+        import ctypes
+
+        from twintext.credentials import load_credentials, save_credentials
+
+        api = Mock()
+        stored = {}
+        retained = []
+
+        def write(pointer, flags):
+            item = ctypes.cast(pointer, api.CredWriteW.argtypes[0]).contents
+            stored["target"] = item.TargetName
+            stored["blob"] = ctypes.string_at(item.CredentialBlob, item.CredentialBlobSize)
+            self.assertEqual(item.Persist, 2)
+            return True
+
+        def read(target, kind, flags, output):
+            pointer_type = api.CredReadW.argtypes[-1]._type_
+            item_type = pointer_type._type_
+            blob = (ctypes.c_ubyte * len(stored["blob"])).from_buffer_copy(stored["blob"])
+            item = item_type(CredentialBlobSize=len(blob), CredentialBlob=blob)
+            retained.extend([blob, item])
+            ctypes.cast(output, ctypes.POINTER(pointer_type))[0] = ctypes.pointer(item)
+            self.assertEqual(target, stored["target"])
+            return True
+
+        api.CredWriteW.side_effect = write
+        api.CredReadW.side_effect = read
+        with patch("twintext.credentials.sys.platform", "win32"), \
+                patch("ctypes.WinDLL", return_value=api, create=True):
+            save_credentials("fixture-secret", "westus")
+            self.assertEqual(load_credentials(), {"key": "fixture-secret", "region": "westus"})
+        self.assertFalse(Path(self.directory.name, "private").exists())
+        self.assertNotIn("fixture-secret", stored["target"])
+        api.CredFree.assert_called_once()
+
     def test_usage_rollover_persistence_and_cache_hits(self):
         from twintext.usage import CloudUsage
 
@@ -195,6 +255,21 @@ class ProviderTests(unittest.TestCase):
         self.assertNotIn("fixture-secret", Path(self.directory.name, "settings.json").read_text())
         with self.assertRaises(TwinTextError):
             call_tool("twintext_set_settings", {"azure_key": "fixture-secret"}, Service())
+
+    def test_mcp_provider_setting_and_model_controls(self):
+        result = call_tool("twintext_set_settings", {"provider": "azure"}, Service())
+        self.assertEqual(result["provider"], "azure")
+        with self.assertRaisesRegex(TwinTextError, "Offline"):
+            call_tool("twintext_install_models", {}, Service())
+
+    def test_web_credentials_are_status_only(self):
+        from twintext.ui import html
+
+        page = html(embedded=True)
+        self.assertIn('id="provider"', page)
+        self.assertIn('id="azure-status"', page)
+        self.assertNotIn('type="password"', page)
+        self.assertNotIn("Ocp-Apim-Subscription-Key", page)
 
     @unittest.skipIf(os.name == "nt", "Unix private file backend")
     def test_credentials_private_permissions_and_no_symlinks(self):

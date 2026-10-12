@@ -1,6 +1,7 @@
 """Translation engines share route/fingerprint/translate; providers own transport."""
 
 import json
+from http.client import HTTPException
 from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -87,7 +88,8 @@ class AzureEngine:
             code = exc.code
             exc.close()
             messages = {
-                400: "Azure rejected the language combination or text. Check source and target languages.",
+                400: ("Azure rejected the language combination or text. "
+                      "Check source and target languages."),
                 401: "Azure authentication failed. Check your credentials and resource region.",
                 403: "Azure access denied. Check credentials, region and resource quota.",
                 408: "Azure translation timed out. Try shorter text or retry later.",
@@ -105,7 +107,12 @@ class AzureEngine:
             raise TwinTextError(
                 "Azure translation timed out. Try shorter text or retry later."
             ) from None
-        except (URLError, OSError, ValueError):
+        except URLError as exc:
+            message = ("Azure translation timed out. Try shorter text or retry later."
+                       if isinstance(exc.reason, TimeoutError)
+                       else "Azure network request failed. Check your connection and credentials.")
+            raise TwinTextError(message) from None
+        except (OSError, ValueError, HTTPException):
             raise TwinTextError(
                 "Azure network request failed. Check your connection and credentials."
             ) from None

@@ -5,7 +5,7 @@ import sys
 
 from twintext import __version__
 from twintext.cache import Cache
-from twintext.config import LANGUAGES, MODES, WORKFLOWS, TwinTextError, update_settings
+from twintext.config import LANGUAGES, MODES, PROVIDERS, WORKFLOWS, TwinTextError, update_settings
 from twintext.engine import STARTER_PAIRS
 from twintext.service import Service
 
@@ -27,7 +27,7 @@ def tools():
             "annotations": {
                 "readOnlyHint": read_only,
                 "destructiveHint": False,
-                "openWorldHint": name == "twintext_install_models",
+                "openWorldHint": name in ("twintext_install_models", "twintext_translate"),
             },
         }
         if ui:
@@ -37,7 +37,8 @@ def tools():
     return [
         tool(
             "twintext_translate",
-            "Translate Markdown offline with local Argos models. "
+            "Translate Markdown using the selected provider (Offline or Azure). "
+            "Azure sends source text to Microsoft using locally configured credentials. "
             "Return bilingual, translated-only, or original display without changing code.",
             {
                 "text": {"type": "string", "maxLength": 100000},
@@ -52,6 +53,7 @@ def tools():
             "twintext_set_settings",
             "Save TwinText translation and display preferences.",
             {
+                "provider": {"type": "string", "enum": list(PROVIDERS)},
                 "source": {"type": "string", "enum": ["auto", *LANGUAGES]},
                 "workflow": {"type": "string", "enum": list(WORKFLOWS)},
                 "target": LANGUAGE_SCHEMA,
@@ -123,6 +125,8 @@ def call_tool(name, arguments, service):
         Cache().clear()
         return {"cleared": True}
     if name == "twintext_install_models":
+        if service.status()["provider"] != "offline":
+            raise TwinTextError("Select Offline before installing Argos models.")
         return {"installed": [service.engine.install(a, b) for a, b in STARTER_PAIRS]}
     return service.status()
 
