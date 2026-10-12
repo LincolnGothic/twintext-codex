@@ -1,12 +1,15 @@
 """One translation workflow used by the CLI, MCP and settings page."""
 
 import re
+import threading
 from dataclasses import replace
 
+from twintext import providers
 from twintext.cache import Cache
 from twintext.config import LANGUAGES, TwinTextError, load_settings
-from twintext.engine import ArgosEngine, detect_language
+from twintext.engine import detect_language
 from twintext.markdown import blocks, prose, reference_ids, translate_block
+from twintext.usage import CloudUsage, usage_label
 
 MAX_TEXT_LENGTH = 100_000
 QUANTITY_HEADER = {"en": "Quantity", "zh": "数量", "ja": "数量", "fr": "Quantité", "es": "Cantidad"}
@@ -14,10 +17,31 @@ QUANTITY_HEADER = {"en": "Quantity", "zh": "数量", "ja": "数量", "fr": "Quan
 
 class Service:
     def __init__(self, engine=None, detector=None):
-        self.engine = engine if engine is not None else ArgosEngine()
+        self._injected_engine = engine
+        self._engine = None
+        self._provider = None
+        self._engine_lock = threading.RLock()
         self.detector = detector or detect_language
 
-    def translate(self, text, source=None, target=None, mode=None):
+    @property
+    def engine(self):
+        return self.engine_for(load_settings().provider)
+
+    def engine_for(self, provider):
+        if self._injected_engine is not None:
+            return self._injected_engine
+        with self._engine_lock:
+            if self._provider != provider:
+                self._engine = providers.create_engine(provider)
+                self._provider = provider
+            return self._engine
+
+    def translate(self, text, source=None, target=None, mode=None, cancel=None):
+        def check_cancel():
+            if cancel is not None and cancel.is_set():
+                raise TwinTextError("Translation cancelled.")
+
+        check_cancel()
         if not isinstance(text, str):
             raise TwinTextError("Text must be a string.")
         if len(text) > MAX_TEXT_LENGTH:
@@ -29,6 +53,7 @@ class Service:
             if v is not None
         }
         settings = replace(settings, **overrides).validate()
+        engine = self.engine_for(settings.provider)
         source = settings.source
         pairs = []
         translated = []
@@ -44,19 +69,28 @@ class Service:
                         "Detected language is unsupported. Choose a source language."
                     )
                 if source != settings.target:
-                    route = [p.to_code for p in self.engine.route(source, settings.target)]
+                    route = [p.to_code for p in engine.route(source, settings.target)]
         needs_translation = bool(route)
-        fingerprint = self.engine.fingerprint(source, settings.target) if needs_translation else ""
+        fingerprint = (
+            settings.provider + ":" + engine.fingerprint(source, settings.target)
+            if needs_translation else ""
+        )
         cache = Cache() if settings.cache and needs_translation else None
 
         def translate_fragment(fragment):
             nonlocal cache_hits
+            check_cancel()
             key = Cache.key(fragment, source, settings.target, fingerprint)
             value = cache.get(key) if cache else None
             if value is not None:
                 cache_hits += 1
                 return value
-            value = self.engine.translate(fragment, source, settings.target)
+            value = (
+                engine.translate(fragment, source, settings.target, cancel=cancel)
+                if cancel is not None and getattr(engine, "provider", "offline") != "offline"
+                else engine.translate(fragment, source, settings.target)
+            )
+            check_cancel()
             if not isinstance(value, str) or not value.strip():
                 raise TwinTextError("The local model returned an empty translation.")
             if cache:
@@ -73,6 +107,7 @@ class Service:
 
         references = reference_ids(text)
         for block in blocks(text):
+            check_cancel()
             value = (
                 translate_block(
                     block.original, translate_fragment, block.kind, references, translate_header
@@ -105,19 +140,34 @@ class Service:
         }
 
     def status(self):
+        settings = load_settings()
         try:
-            routes = self.engine.routes()
+            routes = self.engine_for(settings.provider).routes()
             error = None
         except (TwinTextError, OSError) as exc:
             routes = []
             error = str(exc)
+        configured = False
+        if settings.provider == "azure":
+            try:
+                configured = bool(providers.load_credentials().get("key"))
+                if not configured:
+                    error = "Configure your Azure credentials with twintext azure-configure."
+            except TwinTextError as exc:
+                error = str(exc)
+        usage = CloudUsage().snapshot()
         return {
-            "settings": load_settings().as_dict(),
+            "settings": settings.as_dict(),
             "languages": LANGUAGES,
             "installed_models": routes,
             "engine_error": error,
-            "engine": "Argos Translate / CTranslate2 CPU",
-            "offline": True,
+            "provider": settings.provider,
+            "engine": ("Argos Translate / CTranslate2 CPU" if settings.provider == "offline"
+                       else "Microsoft Azure Translator REST v3"),
+            "offline": settings.provider == "offline",
+            "azure_configured": configured,
+            "cloud_usage": usage,
+            "cloud_usage_label": usage_label(usage),
         }
 
 
@@ -135,9 +185,12 @@ def context():
         f"({settings.target}), using {settings.mode} display. Compose your complete reply "
         "in the conversation's normal source language, "
         "call the local twintext_translate tool with that Markdown, and present its display "
-        "verbatim. This local translation workflow uses ordinary Codex tool/context/output "
+        f"verbatim. Active provider: {settings.provider}. "
+        + ("Azure sends source text to Microsoft Azure Translator. "
+           if settings.provider == "azure" else "Offline translation stays on this computer. ")
+        + "This translation workflow uses ordinary Codex tool/context/output "
         "tokens. Preserve code, paths and links. Do not translate tool results repeatedly. "
         "If translation fails, show the original reply and explain briefly. Do not substitute "
-        "a cloud translation service. These settings apply to new final replies only. "
+        "another translation provider. These settings apply to new final replies only. "
         "Explicit language or display instructions from the user take precedence."
     )

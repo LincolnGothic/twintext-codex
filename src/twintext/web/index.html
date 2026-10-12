@@ -17,6 +17,8 @@
       <section class="card settings" aria-labelledby="preferences-title">
         <h3 id="preferences-title" data-i18n="preferences">Preferences</h3>
         <form id="settings-form">
+          <label for="provider">Translation provider</label><select id="provider" name="provider"><option value="offline">Offline — Argos</option><option value="azure">Microsoft Azure Translator</option></select>
+          <p id="provider-hint" class="hint" hidden>Save your provider selection before translating.</p>
           <label for="workflow" data-i18n="workflow">Translation location</label><select id="workflow" name="workflow"></select>
           <label for="target" data-i18n="target">Translate into</label><select id="target" name="target"></select>
           <label for="source" data-i18n="source">Source language</label><select id="source" name="source"></select>
@@ -43,13 +45,20 @@
           <div id="route" class="hint"></div>
           <button id="copy" class="text-button" hidden type="button" data-i18n="copy">Copy displayed text</button>
         </section>
-        <section class="card models" aria-labelledby="models-title">
+        <section id="offline-controls" class="card models" aria-labelledby="models-title">
           <div class="section-heading"><h3 id="models-title" data-i18n="models">Language pack</h3><span class="pill" data-i18n="noFees">No API fees</span></div>
           <p data-i18n="modelInfo">English, Chinese, Japanese, French, and Spanish. Download once, then translate offline.</p>
           <p id="model-status" class="hint"></p><div id="model-list"></div>
           <button id="install" class="secondary" type="button" data-i18n="install">Download the five-language pack</button>
-          <button id="clear-cache" class="text-button" type="button" data-i18n="clearCache">Clear remembered translations</button>
         </section>
+        <section id="azure-controls" class="card" hidden>
+          <h3>Microsoft Azure Translator</h3>
+          <p id="azure-status" class="hint"></p>
+          <p>Azure sends source text to Microsoft. Screenshots are not sent. Use your own Azure credentials; Microsoft quotas and pricing apply.</p>
+          <p>Configure credentials in the floating reader’s native settings, or run <code>twintext azure-configure</code> in your local terminal. This panel only reports whether credentials are configured.</p>
+          <p id="cloud-usage" class="hint"></p>
+        </section>
+        <button id="clear-cache" class="text-button" type="button" data-i18n="clearCache">Clear remembered translations</button>
       </div>
     </div>
     <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.3.0 · MIT</span></footer>

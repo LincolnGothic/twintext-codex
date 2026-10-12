@@ -10,6 +10,7 @@ from twintext.cache import Cache
 from twintext.config import (
     LANGUAGES,
     MODES,
+    PROVIDERS,
     WORKFLOWS,
     TwinTextError,
     load_settings,
@@ -20,7 +21,7 @@ from twintext.service import Service, context
 
 
 def parser():
-    result = argparse.ArgumentParser(prog="twintext", description="Offline translation for Codex")
+    result = argparse.ArgumentParser(prog="twintext", description="Translation for Codex")
     result.add_argument("--version", action="version", version=__version__)
     commands = result.add_subparsers(dest="command", required=True)
     translate = commands.add_parser("translate", help="Translate a UTF-8 file or stdin")
@@ -30,6 +31,7 @@ def parser():
     translate.add_argument("--mode", choices=MODES)
     translate.add_argument("--json", action="store_true")
     settings = commands.add_parser("settings", help="Read or save settings")
+    settings.add_argument("--provider", choices=PROVIDERS)
     settings.add_argument("--source", choices=["auto", *LANGUAGES])
     settings.add_argument("--workflow", choices=WORKFLOWS)
     settings.add_argument("--target", choices=list(LANGUAGES))
@@ -40,6 +42,9 @@ def parser():
     settings.add_argument("--desktop-auto-start", choices=["true", "false"])
     settings.add_argument("--always-on-top", choices=["true", "false"])
     commands.add_parser("status", help="Inspect settings and installed models")
+    commands.add_parser(
+        "azure-configure", help="Save your Azure credentials via a masked local prompt"
+    )
     models = commands.add_parser("models", help="Manage offline language models")
     operations = models.add_subparsers(dest="operation", required=True)
     operations.add_parser("list", help="List installed models (offline)")
@@ -98,10 +103,20 @@ def main(argv=None):
                 text, source=args.source, target=args.target, mode=args.mode
             )
             print(json.dumps(result, ensure_ascii=False) if args.json else result["display"])
+        elif args.command == "azure-configure":
+            import getpass
+
+            from twintext.credentials import save_credentials
+
+            region = input("Azure resource region (blank for global resources): ").strip()
+            key = getpass.getpass("Azure resource key (hidden): ")
+            save_credentials(key, region)
+            print("Azure credentials configured. Select Azure explicitly in settings to use them.")
         elif args.command == "settings":
             changes = {
                 key: getattr(args, key)
                 for key in (
+                    "provider",
                     "source",
                     "workflow",
                     "target",

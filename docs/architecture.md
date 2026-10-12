@@ -81,6 +81,19 @@ host locale; Desktop otherwise falls back to the system locale. No accessibility
 capture, OCR, screen scraping or Codex-window tracking is implemented.
 
 Desktop's bridge has no network listener. The optional web settings server binds
-only to loopback and checks its session token, Origin and Host. Inference uses
+only to loopback and checks its session token, Origin and Host. Offline inference uses
 installed local models; setup/model installation uses upstream network downloads.
 Chat integration still runs within the user's ordinary Codex service/session.
+
+`Service` selects an engine for each request from persisted `provider` (missing
+means `offline`). `Service(engine=...)` injection still takes precedence. Engines
+implement the existing `route`, `routes`, `fingerprint`, `translate` methods;
+the registry accommodates DeepL without changing Markdown, caching or rendering.
+Cache fingerprints include provider identity and engine version/languages, never
+credentials. Azure uses urllib REST v3 with redirects refused and sanitized errors.
+Only source fragments leave the process. Credential Manager on Windows and the
+owner-only Linux credentials file are available only to native backend code;
+MCP/web UI report a configured boolean. Usage metadata is atomically written under
+a process lock. Azure timeout is 15 seconds per request. Engine cancellation is
+cooperative at request boundaries; in-flight synchronous I/O waits for the bounded
+timeout. Desktop retains its revision guard to discard obsolete results.

@@ -31,6 +31,17 @@ class PendingTranslator:
 
 
 class DesktopTests(unittest.TestCase):
+    def test_provider_selection_status_and_conditional_credentials(self):
+        self.assertEqual(self.window.selects["provider"].currentData(), "offline")
+        self.assertTrue(self.window.azure_button.isHidden())
+        combo = self.window.selects["provider"]
+        combo.setCurrentIndex(combo.findData("azure"))
+        self.assertEqual(load_settings().provider, "azure")
+        self.assertFalse(self.window.azure_button.isHidden())
+        self.assertIn("Azure", self.window.offline.text())
+        self.assertIn("This month:", self.window.azure_status.text())
+        self.assertNotIn("key", self.window.selects)
+
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])

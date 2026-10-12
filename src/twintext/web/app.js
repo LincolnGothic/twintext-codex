@@ -20,6 +20,7 @@
   };
   for (const [code, words] of Object.entries(workflowWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
+  let translationBusy = false, modelsBusy = false;
   let bridgeId = 0;
   const pending = new Map();
   const t = (key, values = {}) => Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, value), translations[locale][key] ?? translations.en[key] ?? key);
@@ -80,6 +81,17 @@
     if (boot.embedded) window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/size-changed",params:{height:document.documentElement.scrollHeight}}, "*");
   }
   function showModels(status) {
+    const azure = $("provider").value === "azure";
+    const unsaved = $("provider").value !== (status.provider || status.settings.provider || "offline");
+    $("provider-hint").hidden = !unsaved;
+    $("translate").disabled = unsaved || translationBusy;
+    $("install").disabled = unsaved || modelsBusy;
+    $("offline-controls").hidden = azure;
+    $("azure-controls").hidden = !azure;
+    $("azure-status").textContent = status.azure_configured ? "Credentials configured" : "Credentials not configured";
+    $("cloud-usage").textContent = status.cloud_usage_label || "";
+    document.querySelector('[data-i18n="local"]').textContent = status.provider === "azure" ? "Microsoft Azure Translator" : t("local");
+    document.querySelector('[data-i18n="tagline"]').textContent = status.provider === "azure" ? "Azure translation for Codex" : t("tagline");
     const models = status.installed_models || [], count = models.length;
     $("model-status").textContent = status.engine_error || (count >= 8 ? t("ready") : t("modelCount", {count}));
     $("model-list").replaceChildren();
@@ -110,30 +122,34 @@
     catch (error) { notify(error.message, true); }
   });
   $("ui-language").addEventListener("change", localize);
+  $("provider").addEventListener("change", () => { if (lastStatus) showModels(lastStatus); });
   document.querySelectorAll("input[name=mode]").forEach(input => input.addEventListener("change", renderResult));
   $("settings-form").addEventListener("submit", async event => {
     event.preventDefault(); $("save").disabled = true;
     try {
-      lastStatus = await tool("twintext_set_settings", {workflow:$("workflow").value,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
+      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:$("workflow").value,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
       localize(); notify(t("saved"));
     } catch (error) { notify(error.message, true); } finally { $("save").disabled = false; }
   });
   $("translate").addEventListener("click", async () => {
     if (!$("input").value.trim()) { notify(t("pasteFirst"), true); return; }
+    translationBusy = true;
     $("translate").disabled = true; $("translate").textContent = t("working"); $("input").setAttribute("aria-busy", "true");
     try {
       // Always obtain the translation once; display modes then switch without inference.
       lastResult = await tool("twintext_translate", {text:$("input").value,source:$("source").value,target:$("target").value,mode:"translated"});
       renderResult(); $("notice").hidden = true;
-    } catch (error) { notify(error.message, true); } finally { $("translate").disabled = false; $("translate").textContent = t("translate"); $("input").setAttribute("aria-busy", "false"); }
+      lastStatus = await tool("twintext_status"); showModels(lastStatus);
+    } catch (error) { notify(error.message, true); } finally { translationBusy = false; if (lastStatus) showModels(lastStatus); $("translate").textContent = t("translate"); $("input").setAttribute("aria-busy", "false"); }
   });
   $("copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(displayText()); notify(t("copied")); } catch { notify(t("copyFailed"), true); } });
   $("clear-cache").addEventListener("click", async () => { try { await tool("twintext_clear_cache"); notify(t("cleared")); } catch (error) { notify(error.message, true); } });
   $("install").addEventListener("click", async () => {
+    modelsBusy = true;
     $("install").disabled = true; $("install").textContent = t("downloading");
     try { await tool("twintext_install_models"); lastStatus = await tool("twintext_status"); showModels(lastStatus); notify(t("installed")); }
     catch (error) { notify(error.message, true); }
-    finally { $("install").disabled = false; $("install").textContent = t("install"); }
+    finally { modelsBusy = false; if (lastStatus) showModels(lastStatus); $("install").textContent = t("install"); }
   });
   async function start() {
     localize();
@@ -148,6 +164,7 @@
         lastStatus = await tool("twintext_set_settings", {host_locale:baseLocale(hostLocale)});
       }
       const settings = lastStatus.settings;
+      $("provider").value = settings.provider || "offline";
       $("workflow").value = settings.workflow || "desktop";
       $("target").value = settings.target; $("source").value = settings.source; $("ui-language").value = settings.ui_language;
       document.querySelector(`input[name=mode][value=${settings.mode}]`).checked = true;
