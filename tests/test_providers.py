@@ -1,11 +1,14 @@
 import io
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import threading
 import unittest
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError, URLError
 
@@ -17,6 +20,47 @@ from twintext.service import Service
 
 
 class ProviderTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("node"), "Node is required for the browser-script regression")
+    def test_web_provider_guard_survives_pending_requests(self):
+        script = Path(__file__).with_name("test_provider_ui.mjs")
+        subprocess.run(
+            [shutil.which("node"), str(script)], check=True, capture_output=True, timeout=10
+        )
+
+    def test_concurrent_engine_selection_cannot_mix_providers(self):
+        assigned, release, azure_done = threading.Event(), threading.Event(), threading.Event()
+
+        class PausedService(Service):
+            def __setattr__(self, name, value):
+                super().__setattr__(name, value)
+                if name == "_engine" and getattr(value, "provider", None) == "offline":
+                    assigned.set()
+                    release.wait(3)
+
+        results = {}
+        service = PausedService()
+
+        def select(provider):
+            results[provider] = service.engine_for(provider)
+            if provider == "azure":
+                azure_done.set()
+
+        with patch(
+            "twintext.providers.create_engine", side_effect=lambda p: SimpleNamespace(provider=p)
+        ):
+            offline = threading.Thread(target=select, args=("offline",))
+            azure = threading.Thread(target=select, args=("azure",))
+            offline.start()
+            self.assertTrue(assigned.wait(2))
+            azure.start()
+            azure_done.wait(0.2)
+            release.set()
+            offline.join(3)
+            azure.join(3)
+            self.assertEqual(results["offline"].provider, "offline")
+            self.assertEqual(results["azure"].provider, "azure")
+            self.assertEqual(service.engine_for("offline").provider, "offline")
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -104,6 +148,16 @@ class ProviderTests(unittest.TestCase):
         raw = Path(self.directory.name, "cloud-usage.json").read_text()
         for forbidden in ("Hello", "Bonjour", "fixture-secret"):
             self.assertNotIn(forbidden, raw)
+
+    def test_long_prose_batches_by_size_instead_of_per_sentence(self):
+        engine = self.engine()
+        engine.usage = Mock()  # Counter persistence is covered by dedicated integration tests.
+        text = "Hello. " * 6500
+        engine.translate(text, "en", "fr")
+        self.assertEqual(len(self.sent), 2)
+        chunks = [json.loads(request.data)[0]["Text"] for request, _ in self.sent]
+        self.assertEqual("".join(chunks), text)
+        self.assertTrue(all(len(chunk) <= 45000 for chunk in chunks))
 
     def test_http_and_network_errors_are_sanitized(self):
         for code, message in [

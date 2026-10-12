@@ -20,6 +20,7 @@
   };
   for (const [code, words] of Object.entries(workflowWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
+  let translationBusy = false, modelsBusy = false;
   let bridgeId = 0;
   const pending = new Map();
   const t = (key, values = {}) => Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, value), translations[locale][key] ?? translations.en[key] ?? key);
@@ -83,8 +84,8 @@
     const azure = $("provider").value === "azure";
     const unsaved = $("provider").value !== (status.provider || status.settings.provider || "offline");
     $("provider-hint").hidden = !unsaved;
-    $("translate").disabled = unsaved;
-    $("install").disabled = unsaved;
+    $("translate").disabled = unsaved || translationBusy;
+    $("install").disabled = unsaved || modelsBusy;
     $("offline-controls").hidden = azure;
     $("azure-controls").hidden = !azure;
     $("azure-status").textContent = status.azure_configured ? "Credentials configured" : "Credentials not configured";
@@ -132,21 +133,23 @@
   });
   $("translate").addEventListener("click", async () => {
     if (!$("input").value.trim()) { notify(t("pasteFirst"), true); return; }
+    translationBusy = true;
     $("translate").disabled = true; $("translate").textContent = t("working"); $("input").setAttribute("aria-busy", "true");
     try {
       // Always obtain the translation once; display modes then switch without inference.
       lastResult = await tool("twintext_translate", {text:$("input").value,source:$("source").value,target:$("target").value,mode:"translated"});
       renderResult(); $("notice").hidden = true;
       lastStatus = await tool("twintext_status"); showModels(lastStatus);
-    } catch (error) { notify(error.message, true); } finally { $("translate").disabled = false; $("translate").textContent = t("translate"); $("input").setAttribute("aria-busy", "false"); }
+    } catch (error) { notify(error.message, true); } finally { translationBusy = false; if (lastStatus) showModels(lastStatus); $("translate").textContent = t("translate"); $("input").setAttribute("aria-busy", "false"); }
   });
   $("copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(displayText()); notify(t("copied")); } catch { notify(t("copyFailed"), true); } });
   $("clear-cache").addEventListener("click", async () => { try { await tool("twintext_clear_cache"); notify(t("cleared")); } catch (error) { notify(error.message, true); } });
   $("install").addEventListener("click", async () => {
+    modelsBusy = true;
     $("install").disabled = true; $("install").textContent = t("downloading");
     try { await tool("twintext_install_models"); lastStatus = await tool("twintext_status"); showModels(lastStatus); notify(t("installed")); }
     catch (error) { notify(error.message, true); }
-    finally { $("install").disabled = false; $("install").textContent = t("install"); }
+    finally { modelsBusy = false; if (lastStatus) showModels(lastStatus); $("install").textContent = t("install"); }
   });
   async function start() {
     localize();

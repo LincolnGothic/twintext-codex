@@ -1,6 +1,7 @@
 """One translation workflow used by the CLI, MCP and settings page."""
 
 import re
+import threading
 from dataclasses import replace
 
 from twintext import providers
@@ -19,6 +20,7 @@ class Service:
         self._injected_engine = engine
         self._engine = None
         self._provider = None
+        self._engine_lock = threading.RLock()
         self.detector = detector or detect_language
 
     @property
@@ -28,10 +30,11 @@ class Service:
     def engine_for(self, provider):
         if self._injected_engine is not None:
             return self._injected_engine
-        if self._provider != provider:
-            self._engine = providers.create_engine(provider)
-            self._provider = provider
-        return self._engine
+        with self._engine_lock:
+            if self._provider != provider:
+                self._engine = providers.create_engine(provider)
+                self._provider = provider
+            return self._engine
 
     def translate(self, text, source=None, target=None, mode=None, cancel=None):
         def check_cancel():

@@ -9,7 +9,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from twintext.config import TwinTextError
 from twintext.credentials import load_credentials
-from twintext.engine import ArgosEngine, sentence_chunks
+from twintext.engine import ArgosEngine
 from twintext.usage import CloudUsage
 
 AZURE_LANGUAGES = {"en": "en", "zh": "zh-Hans", "ja": "ja", "fr": "fr", "es": "es"}
@@ -28,6 +28,17 @@ def azure_language(code):
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None  # Never forward subscription headers to another endpoint.
+
+
+def azure_chunks(text, maximum=45000):
+    while len(text) > maximum:
+        cut = text.rfind(" ", maximum // 2, maximum + 1)
+        if cut < 0:
+            cut = maximum
+        yield text[:cut]
+        text = text[cut:]
+    if text:
+        yield text
 
 
 class AzureEngine:
@@ -65,7 +76,7 @@ class AzureEngine:
         if len(text) > 45000:
             return " ".join(
                 self.translate(chunk, source, target, cancel)
-                for chunk in sentence_chunks(text, 45000)
+                for chunk in azure_chunks(text)
             )
         query = urlencode({"api-version": "3.0", "from": source_code, "to": target_code})
         headers = {
