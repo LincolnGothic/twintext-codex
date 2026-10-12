@@ -12,6 +12,7 @@ from twintext.locking import file_lock
 LANGUAGES = {"en": "English", "zh": "Chinese", "ja": "Japanese", "fr": "French", "es": "Spanish"}
 MODES = ("bilingual", "translated", "original")
 WORKFLOWS = ("desktop", "chat")
+PROVIDERS = ("offline", "azure")
 
 
 class TwinTextError(Exception):
@@ -48,6 +49,7 @@ def private_dir(path: Path) -> Path:
 
 @dataclass(frozen=True)
 class Settings:
+    provider: str = "offline"
     source: str = "auto"
     target: str = "en"
     mode: str = "bilingual"
@@ -60,6 +62,8 @@ class Settings:
     workflow: str = "desktop"
 
     def validate(self):
+        if self.provider not in PROVIDERS:
+            raise TwinTextError("Provider must be offline or azure.")
         if self.workflow not in WORKFLOWS:
             raise TwinTextError("Workflow must be desktop or chat.")
         if self.source not in ("auto", *LANGUAGES):

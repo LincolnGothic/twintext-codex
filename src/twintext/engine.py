@@ -34,6 +34,8 @@ def configure_argos():
 
 
 class ArgosEngine:
+    provider = "offline"
+
     def __init__(self):
         self.lock = threading.RLock()
         self.loaded = OrderedDict()
