@@ -7,7 +7,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt  # noqa: E402
-from PySide6.QtGui import QMouseEvent  # noqa: E402
+from PySide6.QtGui import QMouseEvent, QWheelEvent  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 from test_bridge import payload  # noqa: E402
@@ -17,7 +17,7 @@ from test_markdown_formats import TABLE  # noqa: E402
 from twintext.bridge import Inbox  # noqa: E402
 from twintext.cache import Cache  # noqa: E402
 from twintext.config import LANGUAGES, load_settings, update_settings  # noqa: E402
-from twintext.desktop import WORDS, Companion  # noqa: E402
+from twintext.desktop import WORDS, Companion, run  # noqa: E402
 from twintext.service import Service  # noqa: E402
 
 
@@ -31,6 +31,180 @@ class PendingTranslator:
 
 
 class DesktopTests(unittest.TestCase):
+    def test_close_quits_both_windows_and_preserves_preferences(self):
+        saved = load_settings()
+        self.window.show()
+        self.window.timer.start(300)
+        with patch.object(self.app, "quit") as quit_app:
+            self.assertTrue(self.window.close())
+            quit_app.assert_called_once_with()
+        self.assertFalse(self.window.isVisible())
+        self.assertFalse(self.window.orb.isVisible())
+        self.assertFalse(self.window.timer.isActive())
+        self.assertEqual(load_settings(), saved)
+
+    def test_compact_quit_hides_both_windows_and_cancels_translation(self):
+        saved = load_settings()
+        self.window.collapse()
+        with (
+            patch.object(self.app, "quit") as quit_app,
+            patch.object(self.window, "cancel_translation") as cancel,
+        ):
+            self.window.orb_quit_button.click()
+            quit_app.assert_called_once_with()
+            cancel.assert_called_once_with()
+        self.assertFalse(self.window.isVisible())
+        self.assertFalse(self.window.orb.isVisible())
+        self.assertEqual(load_settings(), saved)
+
+    def test_native_compact_close_quits_both_windows(self):
+        self.window.collapse()
+        with patch.object(self.app, "quit") as quit_app:
+            self.assertTrue(self.window.orb.close())
+            quit_app.assert_called_once_with()
+        self.assertFalse(self.window.isVisible())
+        self.assertFalse(self.window.orb.isVisible())
+
+    def test_switch_to_chat_in_reader_preferences_quits(self):
+        self.window.show()
+        with patch.object(self.app, "quit") as quit_app:
+            combo = self.window.selects["workflow"]
+            combo.setCurrentIndex(combo.findData("chat"))
+            quit_app.assert_called_once_with()
+        self.assertEqual(load_settings().workflow, "chat")
+        self.assertFalse(self.window.isVisible())
+        self.assertFalse(self.window.orb.isVisible())
+
+    def test_external_switch_to_chat_does_not_reopen_for_pending_activation(self):
+        self.inbox.publish(payload())
+        self.window.poll()
+        self.window.collapse()
+        jobs = len(self.worker.jobs)
+        self.inbox.activate()
+        update_settings(workflow="chat")
+        with patch.object(self.app, "quit") as quit_app:
+            self.window.poll()
+            quit_app.assert_called_once_with()
+            self.window.poll()
+            self.window.expand()
+            self.window.collapse()
+            self.assertEqual(quit_app.call_count, 1)
+        self.assertFalse(self.window.isVisible())
+        self.assertFalse(self.window.orb.isVisible())
+        self.assertEqual(len(self.worker.jobs), jobs)
+
+    def test_background_start_in_chat_does_not_create_a_reader(self):
+        update_settings(workflow="chat")
+        with patch("twintext.desktop.desktop_lock") as acquire:
+            self.assertEqual(run(background=True), 0)
+            acquire.assert_not_called()
+
+    def test_chat_switch_during_startup_exits_without_entering_event_loop(self):
+        desktop = load_settings()
+        chat = update_settings(workflow="chat")
+        for states in ([desktop, chat, chat], [desktop, desktop, chat]):
+            with self.subTest(states=states):
+                windows = []
+
+                def create(windows=windows):
+                    window = Companion(self.inbox, self.worker)
+                    windows.append(window)
+                    self.addCleanup(window.orb.deleteLater)
+                    self.addCleanup(window.deleteLater)
+                    return window
+
+                with (
+                    patch("twintext.desktop.load_settings", side_effect=states),
+                    patch("twintext.desktop.desktop_lock") as acquire,
+                    patch("twintext.desktop.Companion", side_effect=create),
+                    patch.object(self.app, "exec", return_value=0) as execute,
+                    patch.object(self.app, "quit"),
+                ):
+                    self.assertEqual(run(background=True), 0)
+                    execute.assert_not_called()
+                    acquire.return_value.close.assert_called_once_with()
+                self.assertTrue(windows[0].quitting)
+                self.assertFalse(windows[0].orb.isVisible())
+                self.assertFalse(windows[0].isVisible())
+
+    def test_manual_reader_in_chat_still_opens_for_settings(self):
+        chat = update_settings(workflow="chat")
+        self.window.settings = chat
+        self.window.localize()
+
+        def execute():
+            self.assertTrue(self.window.isVisible())
+            self.assertFalse(self.window.orb.isVisible())
+            return 0
+
+        with (
+            patch("twintext.desktop.desktop_lock") as acquire,
+            patch("twintext.desktop.Companion", return_value=self.window),
+            patch.object(self.app, "exec", side_effect=execute),
+            patch.object(self.app, "quit"),
+        ):
+            self.assertEqual(run(), 0)
+            acquire.return_value.close.assert_called_once_with()
+
+    def test_shutdown_hides_windows_before_releasing_singleton_lock(self):
+        def release():
+            self.assertFalse(self.window.isVisible())
+            self.assertFalse(self.window.orb.isVisible())
+
+        with (
+            patch("twintext.desktop.desktop_lock") as acquire,
+            patch("twintext.desktop.Companion", return_value=self.window),
+            patch.object(self.app, "exec", return_value=0),
+        ):
+            acquire.return_value.close.side_effect = release
+            self.assertEqual(run(background=True), 0)
+            acquire.return_value.close.assert_called_once_with()
+
+    def test_wheel_preserves_all_dropdowns_even_when_focused(self):
+        self.window.settings = update_settings(workflow="chat")
+        self.window.localize()
+        self.window.sessions.addItems(["First chat", "Second chat"])
+        self.window.show()
+        self.window.preference_scroll.show()
+        self.app.processEvents()
+        for combo in [*self.window.selects.values(), self.window.sessions]:
+            combo.setFocus()
+            previous = combo.currentData(), combo.currentIndex()
+            saved = load_settings()
+            pos = combo.rect().center()
+            event = QWheelEvent(
+                QPointF(pos), QPointF(combo.mapToGlobal(pos)), QPoint(), QPoint(0, -120),
+                Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+                Qt.ScrollPhase.NoScrollPhase, False,
+            )
+            QApplication.sendEvent(combo, event)
+            self.assertEqual((combo.currentData(), combo.currentIndex()), previous)
+            self.assertEqual(load_settings(), saved)
+
+    def test_wheel_over_dropdown_scrolls_preferences_without_changing_selection(self):
+        self.window.show()
+        self.window.resize(480, 560)
+        self.window.preference_scroll.show()
+        self.app.processEvents()
+        bar = self.window.preference_scroll.verticalScrollBar()
+        self.assertGreater(bar.maximum(), 0)
+        bar.setValue(0)
+        combo = self.window.selects["provider"]
+        combo.setFocus()
+        pos = QPoint(8, combo.height() // 2)
+        QTest.wheelEvent(
+            self.window.windowHandle(), combo.mapTo(self.window, pos), QPoint(0, -120)
+        )
+        self.app.processEvents()
+        self.assertEqual(combo.currentData(), "offline")
+        self.assertGreater(bar.value(), 0)
+
+    def test_dropdown_keyboard_selection_still_works(self):
+        combo = self.window.selects["mode"]
+        QTest.keyClick(combo, Qt.Key.Key_Down)
+        self.assertEqual(combo.currentData(), "translated")
+        self.assertEqual(load_settings().mode, "translated")
+
     def test_chat_controls_default_save_and_disable_in_desktop_workflow(self):
         scope = self.window.selects["response_scope"]
         questions = self.window.checks["translate_questions"]

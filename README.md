@@ -9,7 +9,7 @@ TwinText interface language independently, or let Automatic follow the available
 host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 
-[Download 0.5.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.5.0) ·
+[Download 0.5.1](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.5.1) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
@@ -21,7 +21,7 @@ Microsoft Azure Translator is an optional provider using your own credentials.
 | **Desktop** | Completed replies in a separate floating window, with a compact draggable button | Automatic translation makes no additional LLM requests and returns no translations to model context |
 
 Chat preserves the original **0.1** experience; Desktop preserves the **0.2.2**
-experience. Version **0.5.0** maintains both through a shared translation engine,
+experience. Version **0.5.1** maintains both through a shared translation engine,
 Markdown parser, language packs and settings. The old releases are historical
 versions; new fixes apply to both styles in the current version.
 
@@ -56,8 +56,8 @@ Choose your operating system and preferred first-install style:
 
 | Operating system | Chat default | Floating-window default | Checksums |
 | --- | --- | --- | --- |
-| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.0/TwinText-0.5.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.0/TwinText-0.5.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.0/SHA256SUMS-linux.txt) |
-| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.0/TwinText-0.5.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.0/TwinText-0.5.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.0/SHA256SUMS-windows.txt) |
+| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/TwinText-0.5.1-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/TwinText-0.5.1-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/SHA256SUMS-linux.txt) |
+| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/TwinText-0.5.1-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/TwinText-0.5.1-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/SHA256SUMS-windows.txt) |
 
 Each ZIP supports **both** styles. Install one package, then switch in settings.
 Check its SHA-256 hash against the matching checksum file before installation.
@@ -171,6 +171,13 @@ table. See [format coverage and limits](docs/output-formats.md).
 
 - **Collapse** shows a compact TwinText button. Drag its six-dot grip or deliberately
   drag the button to move it; click the button to expand. A dot indicates a new reply.
+  **×** on the compact button or reader quits the reader; **−** collapses it.
+  Closing either window also quits. Auto-start preferences are preserved.
+- Switching to **Codex chat** closes an already-running floating reader, including
+  changes made from the web/embedded settings panel. Chat never launches the
+  floating button automatically; explicitly opening manual preview/settings is available.
+- Scrolling over native dropdowns scrolls the preferences panel without changing
+  selections. Use clicks or keyboard keys to change an option.
 - Drag the reader header to move it; use its bottom-right grip to resize. Settings
   scroll in smaller windows. **Keep above other windows** requests always-on-top behavior.
 - The selector retains the latest reply from up to **24 chats**. Desktop receives
@@ -278,14 +285,14 @@ On Windows, use `.venv\Scripts\python.exe` and `.venv\Scripts\ruff.exe`; set
 `$env:QT_QPA_PLATFORM = 'offscreen'` before the Qt tests. The development install
 above omits the optional engine; add the `engine` extra for real-model work.
 
-Version 0.5.0 includes **100 regression tests** for Windows and Linux with Python
+Version 0.5.1 includes **112 regression tests** for Windows and Linux with Python
 3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
 native hooks, real Offline English→Chinese tables, Qt rendering and preservation
-of settings/models on upgrade. [Release notes](docs/release-0.5.0.md).
+of settings/models on upgrade. [Release notes](docs/release-0.5.1.md).
 Interactive Codex sessions, hook trust and compositor behavior still require host testing.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.5.0.md). Report bugs with your OS, Python/Codex/
+and [release notes](docs/release-0.5.1.md). Report bugs with your OS, Python/Codex/
 TwinText versions, style, language pair and a sanitized Markdown example; avoid
 posting private conversations or local databases.
 
