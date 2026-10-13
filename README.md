@@ -17,13 +17,41 @@ Microsoft Azure Translator is an optional provider using your own credentials.
 
 | Style | What you see | Codex token use |
 | --- | --- | --- |
-| **Chat** | New final replies with bilingual or translated-only text inside the existing Codex chat | Translation tool calls, their results and displayed translations use normal Codex tokens |
+| **Chat** | Selected replies and questions with bilingual or translated-only text inside the existing Codex chat | Translation tool calls, their results and displayed translations use normal Codex tokens |
 | **Desktop** | Completed replies in a separate floating window, with a compact draggable button | Automatic translation makes no additional LLM requests and returns no translations to model context |
 
 Chat preserves the original **0.1** experience; Desktop preserves the **0.2.2**
 experience. Version **0.5.1** maintains both through a shared translation engine,
 Markdown parser, language packs and settings. The old releases are historical
 versions; new fixes apply to both styles in the current version.
+
+Select **Translation location** in TwinText settings. Start a **new Codex chat**
+after switching styles so instructions from the previous style do not persist.
+Desktop is the default for a repository install. A release ZIP chooses its named
+style only on a first installation; upgrades preserve the existing choice.
+
+### Codex Chat
+
+Read the original reply and its translation **inside the Codex conversation**.
+Choose **Bilingual** to show both languages, or **Translation only** to show the
+translated text. Chat does not automatically open a floating reader.
+
+![Illustrated Codex Chat example: an English progress update followed by a bilingual English–Chinese final reply](docs/chat-example.svg)
+
+*Illustrated example, not a Codex screenshot. It shows the default Final answers
+only scope; the exact host layout and offline translation wording can vary.*
+
+After [finishing setup](#finish-setup-and-try-a-translation):
+
+1. Open TwinText settings in the Codex plugin panel, or use `twintext ui --open`
+   with the [Windows CLI launcher](#windows) on Windows.
+2. Set **Translation location → Codex chat**, **Translate into → Chinese**
+   (or your preferred language), and **Display mode → Bilingual**.
+3. Choose **Final answers only** or **All responses (including progress updates)**.
+   Set **Translate questions in chat** separately; it is enabled by default.
+4. Save your preferences and start a **new Codex chat** with TwinText enabled.
+   Ask for a short English answer and check that its translation appears in the
+   same conversation. Language models must be installed for Offline translation.
 
 Chat settings also include **Chat response scope**: **Final answers only** (default)
 or **All responses (including progress updates)**. **Translate questions in chat**
@@ -38,10 +66,22 @@ following the plugin instructions; it does not modify the native chat renderer.
 CLI equivalents: `twintext settings --response-scope final --translate-questions true`
 or `twintext settings --response-scope all --translate-questions false`.
 
-Select **Translation location** in TwinText settings. Start a **new Codex chat**
-after switching styles so instructions from the previous style do not persist.
-Desktop is the default for a repository install. A release ZIP chooses its named
-style only on a first installation; upgrades preserve the existing choice.
+<details>
+<summary>See the Chat settings: response scope, question translation and bilingual display</summary>
+
+![TwinText web settings with Codex chat selected, Final answers only, Translate questions in chat enabled, Chinese target and Bilingual display](docs/chat-settings.jpg)
+
+*Screenshot of TwinText 0.5.1's web settings in an isolated preview. The same
+controls are available in the embedded Codex plugin panel. The preview has no
+language packs installed; install models before using Offline translation.*
+
+</details>
+
+### Desktop
+
+Read completed replies in a **separate floating window**. Collapse it to the
+compact draggable TwinText button, or use **×** to quit the reader. Switching to
+Codex Chat closes a running reader; opening it manually for settings remains available.
 
 ![TwinText displaying an English–Chinese bilingual table](docs/tables.png)
 

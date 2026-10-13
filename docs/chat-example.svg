@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="590" viewBox="0 0 1000 590" role="img" aria-labelledby="title description">
+  <title id="title">Codex Chat with an English–Chinese bilingual final reply</title>
+  <desc id="description">Illustrated example, not a screenshot. With Final answers only selected, the progress update stays in English. The final reply shows the English original followed by Chinese. Questions have a separate translation setting.</desc>
+  <rect width="1000" height="590" rx="20" fill="#f5f7f6"/>
+  <g font-family="Segoe UI, Microsoft YaHei, Noto Sans CJK SC, sans-serif">
+    <text x="36" y="42" font-size="14" font-weight="600" letter-spacing="1.4" fill="#53625b">ILLUSTRATED EXAMPLE · NOT A SCREENSHOT</text>
+    <rect x="28" y="64" width="944" height="442" rx="14" fill="#fff" stroke="#d7dfda"/>
+    <path d="M28 132H972" stroke="#e3e9e5"/>
+    <text x="58" y="107" font-size="24" font-weight="600" fill="#192b23">Codex Chat</text>
+    <rect x="618" y="86" width="324" height="28" rx="14" fill="#e8f3ee"/>
+    <text x="780" y="105" text-anchor="middle" font-size="13" fill="#1a6953">TwinText · English → Chinese · Bilingual</text>
+    <rect x="539" y="160" width="403" height="50" rx="12" fill="#f1f3f2"/>
+    <text x="559" y="191" font-size="17" fill="#283930">Tell me when the tests and update are ready.</text>
+    <text x="58" y="248" font-size="12" font-weight="600" letter-spacing="1" fill="#66776d">PROGRESS UPDATE</text>
+    <text x="58" y="279" font-size="18" fill="#516157">I am checking the update.</text>
+    <text x="580" y="279" font-size="14" fill="#78877e">Final-only scope keeps progress in English.</text>
+    <path d="M58 304H942" stroke="#e9eeeb"/>
+    <text x="58" y="338" font-size="12" font-weight="600" letter-spacing="1" fill="#66776d">FINAL REPLY · BOTH LANGUAGES IN THE CONVERSATION</text>
+    <text x="58" y="381" font-size="24" fill="#1b2c23">The tests passed. The update is ready.</text>
+    <text x="58" y="432" font-size="24" fill="#1b2c23" lang="zh">测试已通过。更新已准备就绪。</text>
+    <text x="58" y="478" font-size="14" fill="#69796f">Translation appears below the original; no desktop reader is needed.</text>
+    <text x="36" y="546" font-size="16" fill="#3f5347">Default: Final answers only · Translate questions in chat: enabled</text>
+    <text x="36" y="571" font-size="14" fill="#63776a">Choose All responses to translate visible progress updates too. Internal reasoning is not translated.</text>
+  </g>
+</svg>
