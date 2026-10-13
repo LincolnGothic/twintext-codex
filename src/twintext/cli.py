@@ -11,6 +11,7 @@ from twintext.config import (
     LANGUAGES,
     MODES,
     PROVIDERS,
+    RESPONSE_SCOPES,
     WORKFLOWS,
     TwinTextError,
     load_settings,
@@ -34,6 +35,8 @@ def parser():
     settings.add_argument("--provider", choices=PROVIDERS)
     settings.add_argument("--source", choices=["auto", *LANGUAGES])
     settings.add_argument("--workflow", choices=WORKFLOWS)
+    settings.add_argument("--response-scope", choices=RESPONSE_SCOPES)
+    settings.add_argument("--translate-questions", choices=["true", "false"])
     settings.add_argument("--target", choices=list(LANGUAGES))
     settings.add_argument("--mode", choices=MODES)
     settings.add_argument("--ui-language", choices=["auto", *LANGUAGES])
@@ -119,6 +122,8 @@ def main(argv=None):
                     "provider",
                     "source",
                     "workflow",
+                    "response_scope",
+                    "translate_questions",
                     "target",
                     "mode",
                     "ui_language",
@@ -129,7 +134,8 @@ def main(argv=None):
                 )
                 if getattr(args, key) is not None
             }
-            for key in ("enabled", "cache", "desktop_auto_start", "always_on_top"):
+            for key in ("enabled", "cache", "desktop_auto_start", "always_on_top",
+                        "translate_questions"):
                 if key in changes:
                     changes[key] = changes[key] == "true"
             value = update_settings(**changes) if changes else load_settings()

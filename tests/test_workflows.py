@@ -2,6 +2,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,7 +15,7 @@ from test_core import FakeEngine
 from test_markdown_formats import TABLE
 
 from twintext.bridge import Inbox, capture
-from twintext.config import config_dir, data_dir, load_settings, update_settings
+from twintext.config import TwinTextError, config_dir, data_dir, load_settings, update_settings
 from twintext.locking import acquire_lock
 from twintext.mcp import handle
 from twintext.service import Service, context
@@ -23,6 +24,69 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_legacy_settings_default_to_final_answers_and_translated_questions(self):
+        path = self.folder / "settings.json"
+        path.write_text('{"workflow":"chat","target":"zh"}', encoding="utf-8")
+        settings = load_settings()
+        self.assertEqual(settings.response_scope, "final")
+        self.assertTrue(settings.translate_questions)
+        self.assertIn("Leave progress updates untranslated", context())
+        self.assertIn("Translate user-directed questions", context())
+        self.assertIn("request_user_input_async", context())
+        self.assertIn("option labels and descriptions", context())
+        self.assertIn("IDs", context())
+        self.assertIn("schema", context())
+
+    def test_response_scope_and_questions_are_independent(self):
+        update_settings(workflow="chat", response_scope="all", translate_questions=False)
+        self.assertIn("Translate progress updates and final answers", context())
+        self.assertIn("Do not translate user-directed questions", context())
+        self.assertNotIn("Leave progress updates untranslated", context())
+        update_settings(response_scope="final", translate_questions=True)
+        self.assertIn("Leave progress updates untranslated", context())
+        self.assertIn("Translate user-directed questions", context())
+        for changes in ({"enabled": False}, {"enabled": True, "mode": "original"}):
+            update_settings(**changes)
+            self.assertIn("paused", context())
+            self.assertNotIn("Translate user-directed questions", context())
+        update_settings(workflow="desktop", mode="bilingual")
+        self.assertEqual(context(), "")
+
+    def test_invalid_chat_controls_preserve_saved_preferences(self):
+        for changes in ({"response_scope": "wrong"}, {"translate_questions": "false"}):
+            with self.assertRaises(TwinTextError):
+                update_settings(**changes)
+        self.assertEqual(load_settings().response_scope, "final")
+        self.assertTrue(load_settings().translate_questions)
+
+    def test_cli_saves_chat_controls_and_reloads_them(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "twintext.cli", "settings", "--response-scope", "all",
+             "--translate-questions", "false"],
+            capture_output=True, text=True, encoding="utf-8", check=True,
+        )
+        self.assertEqual(json.loads(result.stdout)["response_scope"], "all")
+        self.assertFalse(load_settings().translate_questions)
+
+    def test_mcp_saves_chat_controls_and_rejects_invalid_values(self):
+        def save(arguments):
+            return handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                           "params": {"name": "twintext_set_settings", "arguments": arguments}},
+                          self.service)["result"]
+
+        result = save({"response_scope": "all", "translate_questions": False})
+        self.assertFalse(result["isError"])
+        self.assertEqual(result["structuredContent"]["settings"]["response_scope"], "all")
+        self.assertFalse(result["structuredContent"]["settings"]["translate_questions"])
+        for arguments in ({"response_scope": "wrong"}, {"translate_questions": "true"}):
+            self.assertTrue(save(arguments)["isError"])
+        self.assertEqual(load_settings().response_scope, "all")
+
+    @unittest.skipUnless(shutil.which("node"), "Node is required for the settings UI regression")
+    def test_web_chat_controls_restore_save_and_follow_workflow(self):
+        subprocess.run([shutil.which("node"), str(ROOT / "tests/test_chat_ui.mjs")],
+                       check=True, capture_output=True, timeout=10)
+
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)

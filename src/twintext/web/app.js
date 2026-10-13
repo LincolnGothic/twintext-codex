@@ -19,6 +19,14 @@
     es: {workflow:"Ubicación de traducción", desktop:"Ventana flotante", chat:"Chat de Codex", nextReply:"Abre un chat nuevo al cambiar de ubicación. El modo chat usa tokens Codex; la ventana muestra las traducciones por separado."}
   };
   for (const [code, words] of Object.entries(workflowWords)) Object.assign(translations[code], words);
+  const chatWords = {
+    en: {responseScope:"Chat response scope", final:"Final answers only", all:"All responses (including progress updates)", translateQuestions:"Translate questions in chat", chatHint:"Chat only. Questions follow their own setting, including question cards and answer choices."},
+    zh: {responseScope:"聊天回复翻译范围", final:"仅最终回答", all:"所有回复（包括过程更新）", translateQuestions:"翻译聊天中的提问", chatHint:"仅适用于聊天模式。提问由独立设置控制，包括问题卡片及其选项。"},
+    ja: {responseScope:"チャットの翻訳範囲", final:"最終回答のみ", all:"すべての返信（進捗更新を含む）", translateQuestions:"チャットの質問を翻訳", chatHint:"チャットのみ。質問カードと選択肢を含め、質問は個別の設定に従います。"},
+    fr: {responseScope:"Réponses à traduire", final:"Réponses finales uniquement", all:"Toutes les réponses (avec le suivi)", translateQuestions:"Traduire les questions du chat", chatHint:"Chat uniquement. Les questions et leurs choix ont leur propre réglage."},
+    es: {responseScope:"Respuestas a traducir", final:"Solo respuestas finales", all:"Todas las respuestas (incluido el progreso)", translateQuestions:"Traducir preguntas del chat", chatHint:"Solo chat. Las preguntas y sus opciones tienen su propio ajuste."}
+  };
+  for (const [code, words] of Object.entries(chatWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
   let translationBusy = false, modelsBusy = false;
   let bridgeId = 0;
@@ -75,10 +83,19 @@
     const workflow = $("workflow").value || "desktop";
     $("workflow").replaceChildren(new Option(t("desktop"), "desktop"), new Option(t("chat"), "chat"));
     $("workflow").value = workflow;
+    const scope = $("response-scope").value || "final";
+    $("response-scope").replaceChildren(new Option(t("final"), "final"), new Option(t("all"), "all"));
+    $("response-scope").value = scope;
+    chatControls();
     $("ui-language").value = chosen;
     if (lastStatus) showModels(lastStatus);
     if (lastResult) renderResult();
     if (boot.embedded) window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/size-changed",params:{height:document.documentElement.scrollHeight}}, "*");
+  }
+  function chatControls() {
+    const desktop = $("workflow").value !== "chat";
+    $("response-scope").disabled = desktop;
+    $("translate-questions").disabled = desktop;
   }
   function showModels(status) {
     const azure = $("provider").value === "azure";
@@ -122,12 +139,13 @@
     catch (error) { notify(error.message, true); }
   });
   $("ui-language").addEventListener("change", localize);
+  $("workflow").addEventListener("change", chatControls);
   $("provider").addEventListener("change", () => { if (lastStatus) showModels(lastStatus); });
   document.querySelectorAll("input[name=mode]").forEach(input => input.addEventListener("change", renderResult));
   $("settings-form").addEventListener("submit", async event => {
     event.preventDefault(); $("save").disabled = true;
     try {
-      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:$("workflow").value,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
+      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:$("workflow").value,response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
       localize(); notify(t("saved"));
     } catch (error) { notify(error.message, true); } finally { $("save").disabled = false; }
   });
@@ -155,7 +173,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.4.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.5.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }
@@ -166,6 +184,8 @@
       const settings = lastStatus.settings;
       $("provider").value = settings.provider || "offline";
       $("workflow").value = settings.workflow || "desktop";
+      $("response-scope").value = settings.response_scope || "final";
+      $("translate-questions").checked = settings.translate_questions ?? true;
       $("target").value = settings.target; $("source").value = settings.source; $("ui-language").value = settings.ui_language;
       document.querySelector(`input[name=mode][value=${settings.mode}]`).checked = true;
       $("enabled").checked = settings.enabled; $("cache").checked = settings.cache;

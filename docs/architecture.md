@@ -1,4 +1,4 @@
-# TwinText 0.3.0 architecture
+# TwinText architecture
 
 TwinText combines a local translation runtime, a Codex integration plugin and an
 optional Qt floating reader. Chat and Desktop share preferences, language models,
@@ -26,11 +26,18 @@ use atomic replacement under a native advisory lock: `fcntl` on Linux and
 
 1. SessionStart/UserPromptSubmit runs the local context hook, which loads the
    current preferences without reading conversation history.
-2. For an enabled Chat workflow, the hook asks Codex to compose its normal reply,
-   call `twintext_translate` and display the returned text in the selected mode.
-   Paused/original mode emits instructions to stop automatic translation.
+2. For an enabled Chat workflow, `response_scope=final` (default) translates
+   informational final answers only; `all` also includes progress updates.
+   `translate_questions=true` (default) independently includes user-directed
+   questions in the conversation and question cards, with their answer choices.
+   The hook asks Codex to call `twintext_translate` for the selected prose and
+   display the returned text in the selected mode. Question payloads retain
+   their IDs, JSON field names, hidden values, option order and schema constraints;
+   short fields use concise translated labels when bilingual text cannot fit.
+   Paused/original mode stops both response and question translation. Tool results
+   and hidden reasoning are excluded. These controls do not change Desktop capture.
 3. The MCP tool translates locally and returns its result to Codex. The displayed
-   translation is part of the final reply inside the existing chat.
+   translation is part of the selected assistant message or question in the existing chat.
 4. The Stop capture path exits immediately in Chat mode, preventing a second
    automatic Desktop capture.
 

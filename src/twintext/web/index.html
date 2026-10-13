@@ -20,6 +20,9 @@
           <label for="provider">Translation provider</label><select id="provider" name="provider"><option value="offline">Offline — Argos</option><option value="azure">Microsoft Azure Translator</option></select>
           <p id="provider-hint" class="hint" hidden>Save your provider selection before translating.</p>
           <label for="workflow" data-i18n="workflow">Translation location</label><select id="workflow" name="workflow"></select>
+          <label for="response-scope" data-i18n="responseScope">Chat response scope</label><select id="response-scope" name="response_scope"></select>
+          <label class="check"><input type="checkbox" id="translate-questions" checked><span data-i18n="translateQuestions">Translate questions in chat</span></label>
+          <p class="hint" data-i18n="chatHint">Chat only. Questions follow their own setting, including question cards and answer choices.</p>
           <label for="target" data-i18n="target">Translate into</label><select id="target" name="target"></select>
           <label for="source" data-i18n="source">Source language</label><select id="source" name="source"></select>
           <fieldset><legend data-i18n="display">Display mode</legend><div class="mode-group">
@@ -61,7 +64,7 @@
         <button id="clear-cache" class="text-button" type="button" data-i18n="clearCache">Clear remembered translations</button>
       </div>
     </div>
-    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.4.0 · MIT</span></footer>
+    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.5.0 · MIT</span></footer>
   </main>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <script nonce="{{TOKEN}}">window.TWINTEXT_BOOT = {token: "{{TOKEN}}", embedded: {{EMBEDDED}}};
