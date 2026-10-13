@@ -24,5 +24,5 @@ Closing the reader preserves its auto-start setting. In Desktop mode, a later
 completed reply can reopen it when auto-start is enabled. Chat mode never starts
 the floating reader automatically. Restart Codex and open a new chat after updating.
 
-Validation includes 110 regression tests, native Qt wheel routing, shutdown and
+Validation includes 112 regression tests, native Qt wheel routing, shutdown and
 Chat-switch checks, plus the Windows/Linux release installation smoke checks.

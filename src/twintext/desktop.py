@@ -938,8 +938,10 @@ def run(background=False):
     painter.end()
     app.setWindowIcon(QIcon(icon))
     window = Companion()
-    window.collapse() if background else window.show()
     try:
+        if window.quitting or (background and window.settings.workflow == "chat"):
+            return 0
+        window.collapse() if background else window.show()
         return app.exec()
     finally:
         window.quit()

@@ -99,6 +99,53 @@ class DesktopTests(unittest.TestCase):
             self.assertEqual(run(background=True), 0)
             acquire.assert_not_called()
 
+    def test_chat_switch_during_startup_exits_without_entering_event_loop(self):
+        desktop = load_settings()
+        chat = update_settings(workflow="chat")
+        for states in ([desktop, chat, chat], [desktop, desktop, chat]):
+            with self.subTest(states=states):
+                windows = []
+
+                def create(windows=windows):
+                    window = Companion(self.inbox, self.worker)
+                    windows.append(window)
+                    self.addCleanup(window.orb.deleteLater)
+                    self.addCleanup(window.deleteLater)
+                    return window
+
+                with (
+                    patch("twintext.desktop.load_settings", side_effect=states),
+                    patch("twintext.desktop.desktop_lock") as acquire,
+                    patch("twintext.desktop.Companion", side_effect=create),
+                    patch.object(self.app, "exec", return_value=0) as execute,
+                    patch.object(self.app, "quit"),
+                ):
+                    self.assertEqual(run(background=True), 0)
+                    execute.assert_not_called()
+                    acquire.return_value.close.assert_called_once_with()
+                self.assertTrue(windows[0].quitting)
+                self.assertFalse(windows[0].orb.isVisible())
+                self.assertFalse(windows[0].isVisible())
+
+    def test_manual_reader_in_chat_still_opens_for_settings(self):
+        chat = update_settings(workflow="chat")
+        self.window.settings = chat
+        self.window.localize()
+
+        def execute():
+            self.assertTrue(self.window.isVisible())
+            self.assertFalse(self.window.orb.isVisible())
+            return 0
+
+        with (
+            patch("twintext.desktop.desktop_lock") as acquire,
+            patch("twintext.desktop.Companion", return_value=self.window),
+            patch.object(self.app, "exec", side_effect=execute),
+            patch.object(self.app, "quit"),
+        ):
+            self.assertEqual(run(), 0)
+            acquire.return_value.close.assert_called_once_with()
+
     def test_shutdown_hides_windows_before_releasing_singleton_lock(self):
         def release():
             self.assertFalse(self.window.isVisible())

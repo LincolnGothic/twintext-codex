@@ -285,7 +285,7 @@ On Windows, use `.venv\Scripts\python.exe` and `.venv\Scripts\ruff.exe`; set
 `$env:QT_QPA_PLATFORM = 'offscreen'` before the Qt tests. The development install
 above omits the optional engine; add the `engine` extra for real-model work.
 
-Version 0.5.1 includes **110 regression tests** for Windows and Linux with Python
+Version 0.5.1 includes **112 regression tests** for Windows and Linux with Python
 3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
 native hooks, real Offline English→Chinese tables, Qt rendering and preservation
 of settings/models on upgrade. [Release notes](docs/release-0.5.1.md).
