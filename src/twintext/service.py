@@ -180,17 +180,38 @@ def context():
             "TwinText Chat translation is paused. Stop applying earlier TwinText translation "
             "instructions; present new replies normally. Explicit user requests take precedence."
         )
+    responses = (
+        "Translate informational final answers. Leave progress updates untranslated. "
+        if settings.response_scope == "final"
+        else "Translate progress updates and final answers. "
+    )
+    questions = (
+        "Translate user-directed questions in conversation and question cards, even before "
+        "the final answer. Before calling request_user_input or request_user_input_async, "
+        "use twintext_translate for human-readable question text, titles, headers, "
+        "option labels and descriptions; do not translate the tool's JSON as a whole. "
+        "Preserve field names, question IDs, hidden machine values, option order and required "
+        "suffixes. Respect the question tool's schema and length/count limits. If bilingual "
+        "text cannot fit a short field, use a concise translated label and keep bilingual "
+        "text in the question/title or description where allowed. "
+        if settings.translate_questions
+        else "Do not translate user-directed questions in conversation or question cards, "
+        "even in a final answer or when all responses are selected. "
+    )
     return (
-        f"TwinText Chat is enabled. Translate new final replies into {LANGUAGES[settings.target]} "
-        f"({settings.target}), using {settings.mode} display. Compose your complete reply "
+        f"TwinText Chat is enabled. Translate selected assistant text into "
+        f"{LANGUAGES[settings.target]} ({settings.target}), using {settings.mode} display. "
+        + responses + "Questions follow their own setting, independently of response scope. "
+        + questions + "For each selected response or question, compose its text "
         "in the conversation's normal source language, "
         "call the local twintext_translate tool with that Markdown, and present its display "
         f"verbatim. Active provider: {settings.provider}. "
         + ("Azure sends source text to Microsoft Azure Translator. "
            if settings.provider == "azure" else "Offline translation stays on this computer. ")
         + "This translation workflow uses ordinary Codex tool/context/output "
-        "tokens. Preserve code, paths and links. Do not translate tool results repeatedly. "
+        "tokens. Preserve code, paths and links. "
+        "Do not translate tool results or hidden reasoning. "
         "If translation fails, show the original reply and explain briefly. Do not substitute "
-        "another translation provider. These settings apply to new final replies only. "
+        "another translation provider. These settings apply to new assistant messages only. "
         "Explicit language or display instructions from the user take precedence."
     )

@@ -12,6 +12,7 @@ from twintext.locking import file_lock
 LANGUAGES = {"en": "English", "zh": "Chinese", "ja": "Japanese", "fr": "French", "es": "Spanish"}
 MODES = ("bilingual", "translated", "original")
 WORKFLOWS = ("desktop", "chat")
+RESPONSE_SCOPES = ("final", "all")
 PROVIDERS = ("offline", "azure")
 
 
@@ -60,12 +61,16 @@ class Settings:
     desktop_auto_start: bool = True
     always_on_top: bool = True
     workflow: str = "desktop"
+    response_scope: str = "final"
+    translate_questions: bool = True
 
     def validate(self):
         if self.provider not in PROVIDERS:
             raise TwinTextError("Provider must be offline or azure.")
         if self.workflow not in WORKFLOWS:
             raise TwinTextError("Workflow must be desktop or chat.")
+        if self.response_scope not in RESPONSE_SCOPES:
+            raise TwinTextError("Response scope must be final or all.")
         if self.source not in ("auto", *LANGUAGES):
             raise TwinTextError("Source must be auto, en, zh, ja, fr, or es.")
         if self.target not in LANGUAGES:
@@ -78,9 +83,12 @@ class Settings:
             raise TwinTextError("Host locale must be auto, en, zh, ja, fr, or es.")
         if any(
             type(value) is not bool
-            for value in (self.enabled, self.cache, self.desktop_auto_start, self.always_on_top)
+            for value in (self.enabled, self.cache, self.desktop_auto_start, self.always_on_top,
+                          self.translate_questions)
         ):
-            raise TwinTextError("Enabled, cache, auto-start and always-on-top must be booleans.")
+            raise TwinTextError(
+                "Enabled, cache, auto-start, always-on-top and questions must be booleans."
+            )
         return self
 
     def as_dict(self):

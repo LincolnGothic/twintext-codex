@@ -5,7 +5,15 @@ import sys
 
 from twintext import __version__
 from twintext.cache import Cache
-from twintext.config import LANGUAGES, MODES, PROVIDERS, WORKFLOWS, TwinTextError, update_settings
+from twintext.config import (
+    LANGUAGES,
+    MODES,
+    PROVIDERS,
+    RESPONSE_SCOPES,
+    WORKFLOWS,
+    TwinTextError,
+    update_settings,
+)
 from twintext.engine import STARTER_PAIRS
 from twintext.service import Service
 
@@ -56,6 +64,8 @@ def tools():
                 "provider": {"type": "string", "enum": list(PROVIDERS)},
                 "source": {"type": "string", "enum": ["auto", *LANGUAGES]},
                 "workflow": {"type": "string", "enum": list(WORKFLOWS)},
+                "response_scope": {"type": "string", "enum": list(RESPONSE_SCOPES)},
+                "translate_questions": {"type": "boolean"},
                 "target": LANGUAGE_SCHEMA,
                 "mode": {"type": "string", "enum": list(MODES)},
                 "ui_language": {"type": "string", "enum": ["auto", *LANGUAGES]},

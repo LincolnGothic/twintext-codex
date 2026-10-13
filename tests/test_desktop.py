@@ -31,6 +31,25 @@ class PendingTranslator:
 
 
 class DesktopTests(unittest.TestCase):
+    def test_chat_controls_default_save_and_disable_in_desktop_workflow(self):
+        scope = self.window.selects["response_scope"]
+        questions = self.window.checks["translate_questions"]
+        self.assertEqual(scope.currentData(), "final")
+        self.assertTrue(questions.isChecked())
+        self.assertFalse(scope.isEnabled())
+        self.assertFalse(questions.isEnabled())
+        self.window.selects["workflow"].setCurrentIndex(1)
+        self.assertTrue(scope.isEnabled())
+        self.assertTrue(questions.isEnabled())
+        scope.setCurrentIndex(scope.findData("all"))
+        questions.setChecked(False)
+        self.assertEqual(load_settings().response_scope, "all")
+        self.assertFalse(load_settings().translate_questions)
+        self.window.selects["workflow"].setCurrentIndex(0)
+        self.assertFalse(scope.isEnabled())
+        self.assertEqual(load_settings().response_scope, "all")
+        self.assertFalse(load_settings().translate_questions)
+
     def test_provider_selection_status_and_conditional_credentials(self):
         self.assertEqual(self.window.selects["provider"].currentData(), "offline")
         self.assertTrue(self.window.azure_button.isHidden())

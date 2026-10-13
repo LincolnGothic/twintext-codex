@@ -31,6 +31,7 @@ from twintext.config import (
     LANGUAGES,
     MODES,
     PROVIDERS,
+    RESPONSE_SCOPES,
     WORKFLOWS,
     TwinTextError,
     load_settings,
@@ -282,13 +283,27 @@ WORDS = {
 
 
 for _language, _labels in {
-    "en": ("Translation location", "Floating window", "Codex chat"),
-    "zh": ("翻译显示位置", "浮动窗口", "Codex 聊天"),
-    "ja": ("翻訳の表示先", "フローティングウィンドウ", "Codex チャット"),
-    "fr": ("Emplacement de la traduction", "Fenêtre flottante", "Conversation Codex"),
-    "es": ("Ubicación de traducción", "Ventana flotante", "Chat de Codex"),
+    "en": ("Translation location", "Floating window", "Codex chat", "Chat response scope",
+           "Final answers only", "All responses (including progress updates)",
+           "Translate questions in chat", "Chat only. Questions follow their own setting."),
+    "zh": ("翻译显示位置", "浮动窗口", "Codex 聊天", "聊天回复翻译范围",
+           "仅最终回答", "所有回复（包括过程更新）", "翻译聊天中的提问",
+           "仅适用于聊天模式。提问由独立设置控制。"),
+    "ja": ("翻訳の表示先", "フローティングウィンドウ", "Codex チャット", "チャットの翻訳範囲",
+           "最終回答のみ", "すべての返信（進捗更新を含む）", "チャットの質問を翻訳",
+           "チャットのみ。質問は個別の設定に従います。"),
+    "fr": ("Emplacement de la traduction", "Fenêtre flottante", "Conversation Codex",
+           "Réponses à traduire", "Réponses finales uniquement",
+           "Toutes les réponses (avec le suivi)", "Traduire les questions du chat",
+           "Chat uniquement. Les questions ont leur propre réglage."),
+    "es": ("Ubicación de traducción", "Ventana flotante", "Chat de Codex", "Respuestas a traducir",
+           "Solo respuestas finales", "Todas las respuestas (incluido el progreso)",
+           "Traducir preguntas del chat", "Solo chat. Las preguntas tienen su propio ajuste."),
 }.items():
-    WORDS[_language].update(dict(zip(("workflow", "desktop", "chat"), _labels, strict=True)))
+    WORDS[_language].update(dict(zip(
+        ("workflow", "desktop", "chat", "response_scope", "final", "all", "translate_questions",
+         "chat_hint"), _labels, strict=True,
+    )))
 
 
 def display_text(result, mode):
@@ -440,7 +455,7 @@ class Companion(QWidget):
         form = QFormLayout(self.preferences)
         self.selects = {}
         self.labels = {}
-        for key in ("provider", "workflow", "source", "target", "mode", "ui"):
+        for key in ("provider", "workflow", "response_scope", "source", "target", "mode", "ui"):
             label = QLabel()
             combo = QComboBox()
             self.labels[key] = label
@@ -453,7 +468,7 @@ class Companion(QWidget):
         self.azure_status.setWordWrap(True)
         form.addRow(self.azure_status)
         self.checks = {}
-        for key in ("enabled", "cache", "start", "pin"):
+        for key in ("enabled", "translate_questions", "cache", "start", "pin"):
             box = QCheckBox()
             self.checks[key] = box
             form.addRow(box)
@@ -596,6 +611,7 @@ class Companion(QWidget):
             combo.blockSignals(True)
             combo.clear()
             codes = (PROVIDERS if key == "provider" else WORKFLOWS if key == "workflow"
+                     else RESPONSE_SCOPES if key == "response_scope"
                      else MODES if key == "mode" else list(LANGUAGES))
             if key in ("source", "ui"):
                 codes = ["auto", *codes]
@@ -612,6 +628,9 @@ class Companion(QWidget):
             box.setChecked(getattr(self.settings, field))
             box.setText(self.t(key))
             box.blockSignals(False)
+        for control in (self.selects["response_scope"], self.checks["translate_questions"]):
+            control.setEnabled(self.settings.workflow == "chat")
+            control.setToolTip(self.t("chat_hint"))
         self.update_status()
         if not self.text:
             self.reader.setPlainText(self.t("empty"))
@@ -631,6 +650,8 @@ class Companion(QWidget):
             self.settings = update_settings(
                 provider=self.selects["provider"].currentData(),
                 workflow=self.selects["workflow"].currentData(),
+                response_scope=self.selects["response_scope"].currentData(),
+                translate_questions=self.checks["translate_questions"].isChecked(),
                 source=self.selects["source"].currentData(),
                 target=self.selects["target"].currentData(),
                 mode=self.selects["mode"].currentData(),
