@@ -4,7 +4,7 @@ import queue
 import sqlite3
 import threading
 
-from PySide6.QtCore import QLocale, Qt, QTimer
+from PySide6.QtCore import QEvent, QLocale, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -410,12 +410,20 @@ class ExpandButton(QPushButton):
             super().mouseReleaseEvent(event)
 
 
+class NoWheelComboBox(QComboBox):
+    """Let wheel events scroll the surrounding panel without changing preferences."""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
 class Companion(QWidget):
     def __init__(self, inbox=None, translator=None):
         super().__init__()
         self.inbox = inbox or Inbox()
         self.translator = translator or Translator()
         self.settings = load_settings()
+        self.quitting = False
         self.revision = 0
         self.text = ""
         self.last_result = None
@@ -442,13 +450,17 @@ class Companion(QWidget):
         self.settings_button = QPushButton()
         self.collapse_button = QPushButton("−")
         self.collapse_button.setFixedWidth(36)
+        self.close_button = QPushButton("×")
+        self.close_button.setFixedWidth(36)
+        self.close_button.clicked.connect(self.quit)
         header_layout.addWidget(self.settings_button)
         header_layout.addWidget(self.collapse_button)
+        header_layout.addWidget(self.close_button)
         layout.addWidget(header)
         self.offline = QLabel()
         self.offline.setObjectName("muted")
         layout.addWidget(self.offline)
-        self.sessions = QComboBox()
+        self.sessions = NoWheelComboBox()
         layout.addWidget(self.sessions)
         self.preferences = QFrame()
         self.preferences.setObjectName("preferences")
@@ -457,7 +469,7 @@ class Companion(QWidget):
         self.labels = {}
         for key in ("provider", "workflow", "response_scope", "source", "target", "mode", "ui"):
             label = QLabel()
-            combo = QComboBox()
+            combo = NoWheelComboBox()
             self.labels[key] = label
             self.selects[key] = combo
             form.addRow(label, combo)
@@ -522,6 +534,7 @@ class Companion(QWidget):
         self.orb = QWidget(None, Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
         self.orb.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.orb.setWindowTitle("TwinText")
+        self.orb.installEventFilter(self)
         self.orb.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         orb_layout = QHBoxLayout(self.orb)
         orb_layout.setContentsMargins(0, 0, 0, 0)
@@ -537,8 +550,13 @@ class Companion(QWidget):
         self.orb_button.setMinimumSize(116, 36)
         self.orb_button.clicked.connect(self.expand)
         panel_layout.addWidget(self.orb_button)
+        self.orb_quit_button = QPushButton("×")
+        self.orb_quit_button.setObjectName("orbQuit")
+        self.orb_quit_button.setFixedSize(28, 36)
+        self.orb_quit_button.clicked.connect(self.quit)
+        panel_layout.addWidget(self.orb_quit_button)
         orb_layout.addWidget(panel)
-        self.orb.setFixedSize(164, 48)
+        self.orb.setFixedSize(196, 48)
         self.setStyleSheet(STYLE)
         self.orb.setStyleSheet(STYLE)
         self.localize()
@@ -552,7 +570,7 @@ class Companion(QWidget):
         self.translate_button.clicked.connect(self.translate_manual)
         self.copy_button.clicked.connect(self.copy)
         self.clear_button.clicked.connect(self.clear)
-        self.quit_button.clicked.connect(QApplication.instance().quit)
+        self.quit_button.clicked.connect(self.quit)
         self.sessions.currentIndexChanged.connect(self.select_reply)
         for combo in self.selects.values():
             combo.currentIndexChanged.connect(self.save_preferences)
@@ -601,10 +619,14 @@ class Companion(QWidget):
         self.locale_hint.setText(self.t("locale_hint"))
         self.editor.setPlaceholderText(self.t("placeholder"))
         self.collapse_button.setToolTip(self.t("collapse"))
+        self.close_button.setToolTip(self.t("quit"))
+        self.close_button.setAccessibleName(self.t("quit"))
         self.orb_handle.setToolTip(self.t("drag"))
         self.orb_handle.setAccessibleName(self.t("drag"))
         self.orb_button.setToolTip(self.t("expand"))
         self.orb_button.setAccessibleName(self.t("expand"))
+        self.orb_quit_button.setToolTip(self.t("quit"))
+        self.orb_quit_button.setAccessibleName(self.t("quit"))
         self.checks["cache"].setToolTip(self.t("cache_hint"))
         self.clear_button.setToolTip(self.t("inbox_hint"))
         for key, combo in self.selects.items():
@@ -667,6 +689,9 @@ class Companion(QWidget):
 
     def settings_changed(self, previous):
         self.localize()
+        if previous.workflow == "desktop" and self.settings.workflow == "chat":
+            self.quit()
+            return
         if previous.always_on_top != self.settings.always_on_top:
             self.apply_pin()
         if (previous.source, previous.target, previous.cache, previous.provider) != (
@@ -711,6 +736,8 @@ class Companion(QWidget):
                 window.show()
 
     def expand(self):
+        if self.quitting:
+            return
         self.orb.hide()
         self.show()
         self.raise_()
@@ -718,6 +745,8 @@ class Companion(QWidget):
         self.orb_button.setText("TwinText  ↗")
 
     def collapse(self):
+        if self.quitting:
+            return
         self.hide()
         self.orb.show()
 
@@ -728,9 +757,24 @@ class Companion(QWidget):
         except (OSError, sqlite3.Error) as exc:
             self.status.setText(str(exc))
 
+    def quit(self):
+        if self.quitting:
+            return
+        self.quitting = True
+        self.timer.stop()
+        self.cancel_translation()
+        self.hide()
+        self.orb.hide()
+        QApplication.instance().quit()
+
     def closeEvent(self, event):
-        event.ignore()
-        self.collapse()
+        event.accept()
+        self.quit()
+
+    def eventFilter(self, watched, event):
+        if watched is self.orb and event.type() == QEvent.Type.Close:
+            self.quit()
+        return super().eventFilter(watched, event)
 
     def paste(self):
         self.editor.show()
@@ -796,11 +840,15 @@ class Companion(QWidget):
         self.localize()
 
     def poll(self):
+        if self.quitting:
+            return
         try:
             current = load_settings()
             if current != self.settings:
                 previous, self.settings = self.settings, current
                 self.settings_changed(previous)
+                if self.quitting:
+                    return
             activation = self.inbox.activation()
             if activation != self.activation:
                 self.activation = activation
@@ -857,14 +905,17 @@ padding: 14px; font-size: 14px; }
 QFrame#preferences { background: #edf4ef; border-radius: 9px; }
 QFrame#orbPanel { background: #173f35; border: 1px solid #396757; border-radius: 23px; }
 QFrame#orbPanel QWidget { background: transparent; }
-QPushButton#orbExpand { background: transparent; color: #f0fff8; border: none;
+QPushButton#orbExpand, QPushButton#orbQuit { background: transparent; color: #f0fff8; border: none;
 border-radius: 18px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
-QPushButton#orbExpand:hover { background: #285647; }
+QPushButton#orbExpand:hover, QPushButton#orbQuit:hover { background: #285647; }
+QPushButton#orbQuit { padding: 0; font-size: 18px; }
 QCheckBox { padding: 2px; }
 """
 
 
 def run(background=False):
+    if background and load_settings().workflow == "chat":
+        return 0
     lock = desktop_lock()
     if lock is None:
         if not background:
@@ -891,4 +942,5 @@ def run(background=False):
     try:
         return app.exec()
     finally:
+        window.quit()
         lock.close()
