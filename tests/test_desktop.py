@@ -31,6 +31,71 @@ class PendingTranslator:
 
 
 class DesktopTests(unittest.TestCase):
+    def test_native_preferences_can_choose_floating_before_switching_to_chat(self):
+        presentation = self.window.selects["chat_presentation"]
+        self.assertTrue(presentation.isEnabled())
+        presentation.setCurrentIndex(presentation.findData("floating"))
+        with patch.object(self.app, "quit") as quit_app:
+            workflow = self.window.selects["workflow"]
+            workflow.setCurrentIndex(workflow.findData("chat"))
+            quit_app.assert_not_called()
+        self.assertTrue(load_settings().floating_chat)
+        self.assertTrue(self.window.orb.isVisible())
+
+    def test_floating_chat_button_toggles_reader_and_copy_preserves_original(self):
+        self.window.settings = update_settings(workflow="chat", chat_presentation="floating")
+        self.window.localize()
+        text = "Original English.\n\n```sh\nnpm test\n```\n"
+        self.inbox.publish(payload(text=text), archive=True)
+        self.window.poll()
+        self.deliver_result()
+        jobs = len(self.worker.jobs)
+        self.window.collapse()
+        self.window.orb_button.click()
+        self.assertTrue(self.window.isVisible())
+        self.assertTrue(self.window.orb.isVisible())
+        self.assertIn("译:Original English", self.window.reader.toPlainText())
+        self.window.copy()
+        self.assertEqual(self.app.clipboard().text(), text)
+        self.window.orb_button.click()
+        self.assertFalse(self.window.isVisible())
+        self.assertTrue(self.window.orb.isVisible())
+        self.window.orb_button.click()
+        self.assertTrue(self.window.isVisible())
+        self.assertEqual(len(self.worker.jobs), jobs)
+
+    def test_floating_reader_reuses_saved_translations_for_previous_replies(self):
+        self.window.settings = update_settings(workflow="chat", chat_presentation="floating")
+        self.window.localize()
+        self.inbox.publish(payload(text="First"), archive=True)
+        self.window.poll()
+        self.deliver_result()
+        self.inbox.publish(payload(turn="next", text="Second"), archive=True)
+        self.window.poll()
+        self.deliver_result()
+        self.assertEqual(self.window.sessions.count(), 2)
+        jobs = len(self.worker.jobs)
+        self.window.sessions.setCurrentIndex(1)
+        self.assertIn("译:First", self.window.reader.toPlainText())
+        self.assertEqual(len(self.worker.jobs), jobs)
+        Cache().clear()
+        self.window.sessions.setCurrentIndex(0)
+        self.window.sessions.setCurrentIndex(1)
+        self.assertIn("译:First", self.window.reader.toPlainText())
+        self.assertEqual(len(self.worker.jobs), jobs)
+
+    def test_background_floating_chat_creates_button_without_entering_inline_reader(self):
+        update_settings(workflow="chat", chat_presentation="floating")
+        with (
+            patch("twintext.desktop.desktop_lock") as acquire,
+            patch("twintext.desktop.Companion", return_value=self.window),
+            patch.object(self.app, "exec", return_value=0) as execute,
+        ):
+            self.window.settings = load_settings()
+            self.assertEqual(run(background=True), 0)
+            execute.assert_called_once_with()
+            acquire.return_value.close.assert_called_once_with()
+
     def test_close_quits_both_windows_and_preserves_preferences(self):
         saved = load_settings()
         self.window.show()

@@ -27,6 +27,14 @@
     es: {responseScope:"Respuestas a traducir", final:"Solo respuestas finales", all:"Todas las respuestas (incluido el progreso)", translateQuestions:"Traducir preguntas del chat", chatHint:"Solo chat. Las preguntas y sus opciones tienen su propio ajuste."}
   };
   for (const [code, words] of Object.entries(chatWords)) Object.assign(translations[code], words);
+  const presentationWords = {
+    en: {chatPresentation:"Chat presentation",inline:"In conversation",floating:"Floating button and reader"},
+    zh: {chatPresentation:"聊天显示方式",inline:"在对话中显示",floating:"浮动按钮和阅读器"},
+    ja: {chatPresentation:"チャットの表示",inline:"会話内",floating:"フローティングボタンとリーダー"},
+    fr: {chatPresentation:"Présentation du chat",inline:"Dans la conversation",floating:"Bouton et lecteur flottants"},
+    es: {chatPresentation:"Presentación del chat",inline:"En la conversación",floating:"Botón y lector flotantes"}
+  };
+  for (const [code, words] of Object.entries(presentationWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
   let translationBusy = false, modelsBusy = false;
   let bridgeId = 0;
@@ -86,6 +94,9 @@
     const scope = $("response-scope").value || "final";
     $("response-scope").replaceChildren(new Option(t("final"), "final"), new Option(t("all"), "all"));
     $("response-scope").value = scope;
+    const presentation = $("chat-presentation").value || "inline";
+    $("chat-presentation").replaceChildren(new Option(t("inline"), "inline"), new Option(t("floating"), "floating"));
+    $("chat-presentation").value = presentation;
     chatControls();
     $("ui-language").value = chosen;
     if (lastStatus) showModels(lastStatus);
@@ -95,6 +106,7 @@
   function chatControls() {
     const desktop = $("workflow").value !== "chat";
     $("response-scope").disabled = desktop;
+    $("chat-presentation").disabled = desktop;
     $("translate-questions").disabled = desktop;
   }
   function showModels(status) {
@@ -145,7 +157,7 @@
   $("settings-form").addEventListener("submit", async event => {
     event.preventDefault(); $("save").disabled = true;
     try {
-      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:$("workflow").value,response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
+      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:$("workflow").value,chat_presentation:$("chat-presentation").value,response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
       localize(); notify(t("saved"));
     } catch (error) { notify(error.message, true); } finally { $("save").disabled = false; }
   });
@@ -173,7 +185,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.5.1"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.6.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }
@@ -185,6 +197,7 @@
       $("provider").value = settings.provider || "offline";
       $("workflow").value = settings.workflow || "desktop";
       $("response-scope").value = settings.response_scope || "final";
+      $("chat-presentation").value = settings.chat_presentation || "inline";
       $("translate-questions").checked = settings.translate_questions ?? true;
       $("target").value = settings.target; $("source").value = settings.source; $("ui-language").value = settings.ui_language;
       document.querySelector(`input[name=mode][value=${settings.mode}]`).checked = true;

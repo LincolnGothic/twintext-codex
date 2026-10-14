@@ -38,8 +38,20 @@ use atomic replacement under a native advisory lock: `fcntl` on Linux and
    and hidden reasoning are excluded. These controls do not change Desktop capture.
 3. The MCP tool translates locally and returns its result to Codex. The displayed
    translation is part of the selected assistant message or question in the existing chat.
-4. The Stop capture path exits immediately in Chat mode, preventing a second
-   automatic Desktop capture.
+4. With the default `chat_presentation=inline`, Stop exits without a Desktop capture.
+   With `chat_presentation=floating`, assistant text stays original and Stop archives
+   completed final answers for the separate reader. Selected progress and question
+   summaries reach it through `twintext_send_to_reader`, returning only receipt status.
+   The context hook supplies the session ID. Delivery still uses normal tool tokens;
+   reader translations do not enter model context.
+
+Floating Chat keeps originals in the inbox's separate `history` table and completed
+translations in `history_translations`, keyed by reply, provider, source and target.
+It does not overwrite earlier received replies or expire them automatically.
+Clearing the ordinary fragment cache leaves this history intact. Selecting a reply
+with no saved translation translates it on demand; completed results are retained.
+The draggable button shows/hides the reader without changing translation preferences
+or re-running inference. Its Copy original returns the exact original Markdown.
 
 Local inference does not call a translation LLM, but instructions, tool arguments,
 tool results and displayed output consume normal Codex context/output tokens.

@@ -3,6 +3,7 @@
 import queue
 import sqlite3
 import threading
+from datetime import datetime
 
 from PySide6.QtCore import QEvent, QLocale, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
@@ -28,6 +29,7 @@ from PySide6.QtWidgets import (
 from twintext.bridge import Inbox, desktop_lock
 from twintext.cache import Cache
 from twintext.config import (
+    CHAT_PRESENTATIONS,
     LANGUAGES,
     MODES,
     PROVIDERS,
@@ -305,6 +307,19 @@ for _language, _labels in {
          "chat_hint"), _labels, strict=True,
     )))
 
+for _language, _labels in {
+    "en": ("Chat presentation", "In conversation", "Floating button and reader", "Copy original"),
+    "zh": ("聊天显示方式", "在对话中显示", "浮动按钮和阅读器", "复制原文"),
+    "ja": ("チャットの表示", "会話内", "フローティングボタンとリーダー", "原文をコピー"),
+    "fr": ("Présentation du chat", "Dans la conversation", "Bouton et lecteur flottants",
+           "Copier l’original"),
+    "es": ("Presentación del chat", "En la conversación", "Botón y lector flotantes",
+           "Copiar el original"),
+}.items():
+    WORDS[_language].update(dict(zip(
+        ("chat_presentation", "inline", "floating", "copy_original"), _labels, strict=True,
+    )))
+
 
 def display_text(result, mode):
     if mode == "original":
@@ -427,6 +442,8 @@ class Companion(QWidget):
         self.revision = 0
         self.text = ""
         self.last_result = None
+        self.reply_id = None
+        self.pending_translation = None
         self.rows = []
         self.ids = ()
         self.activation = self.inbox.activation()
@@ -467,7 +484,8 @@ class Companion(QWidget):
         form = QFormLayout(self.preferences)
         self.selects = {}
         self.labels = {}
-        for key in ("provider", "workflow", "response_scope", "source", "target", "mode", "ui"):
+        for key in ("provider", "workflow", "chat_presentation", "response_scope", "source",
+                    "target", "mode", "ui"):
             label = QLabel()
             combo = NoWheelComboBox()
             self.labels[key] = label
@@ -548,7 +566,7 @@ class Companion(QWidget):
         self.orb_button = ExpandButton("TwinText  ↗")
         self.orb_button.setObjectName("orbExpand")
         self.orb_button.setMinimumSize(116, 36)
-        self.orb_button.clicked.connect(self.expand)
+        self.orb_button.clicked.connect(self.orb_clicked)
         panel_layout.addWidget(self.orb_button)
         self.orb_quit_button = QPushButton("×")
         self.orb_quit_button.setObjectName("orbQuit")
@@ -600,6 +618,14 @@ class Companion(QWidget):
             (self.quit_button, "quit"),
         ):
             button.setText(self.t(key))
+        if self.settings.floating_chat:
+            self.copy_button.setText(self.t("copy_original"))
+        self.orb_handle.setVisible(not self.settings.floating_chat)
+        self.orb_button.setCheckable(self.settings.floating_chat)
+        self.orb_button.setChecked(self.settings.floating_chat and self.isVisible())
+        self.orb_button.setMinimumSize(36 if self.settings.floating_chat else 116, 36)
+        self.orb_button.setText("T" if self.settings.floating_chat else "TwinText  ↗")
+        self.orb.setFixedSize(84 if self.settings.floating_chat else 196, 48)
         self.offline.setText(
             self.t("offline") if self.settings.provider == "offline"
             else "Azure — source text is sent to Microsoft; screenshots are not sent."
@@ -633,6 +659,7 @@ class Companion(QWidget):
             combo.blockSignals(True)
             combo.clear()
             codes = (PROVIDERS if key == "provider" else WORKFLOWS if key == "workflow"
+                     else CHAT_PRESENTATIONS if key == "chat_presentation"
                      else RESPONSE_SCOPES if key == "response_scope"
                      else MODES if key == "mode" else list(LANGUAGES))
             if key in ("source", "ui"):
@@ -650,6 +677,8 @@ class Companion(QWidget):
             box.setChecked(getattr(self.settings, field))
             box.setText(self.t(key))
             box.blockSignals(False)
+        # Choose the presentation before switching: inline Chat closes this window.
+        self.selects["chat_presentation"].setToolTip(self.t("chat_hint"))
         for control in (self.selects["response_scope"], self.checks["translate_questions"]):
             control.setEnabled(self.settings.workflow == "chat")
             control.setToolTip(self.t("chat_hint"))
@@ -672,6 +701,7 @@ class Companion(QWidget):
             self.settings = update_settings(
                 provider=self.selects["provider"].currentData(),
                 workflow=self.selects["workflow"].currentData(),
+                chat_presentation=self.selects["chat_presentation"].currentData(),
                 response_scope=self.selects["response_scope"].currentData(),
                 translate_questions=self.checks["translate_questions"].isChecked(),
                 source=self.selects["source"].currentData(),
@@ -689,9 +719,14 @@ class Companion(QWidget):
 
     def settings_changed(self, previous):
         self.localize()
-        if previous.workflow == "desktop" and self.settings.workflow == "chat":
+        if ((previous.workflow == "desktop" or previous.floating_chat)
+                and self.settings.workflow == "chat" and not self.settings.floating_chat):
             self.quit()
             return
+        if previous.floating_chat != self.settings.floating_chat:
+            self.ids = ()
+            if self.settings.floating_chat:
+                self.orb.show()
         if previous.always_on_top != self.settings.always_on_top:
             self.apply_pin()
         if (previous.source, previous.target, previous.cache, previous.provider) != (
@@ -738,17 +773,35 @@ class Companion(QWidget):
     def expand(self):
         if self.quitting:
             return
-        self.orb.hide()
+        if self.settings.floating_chat:
+            self.orb.show()
+            area = self.orb.screen().availableGeometry()
+            self.move(
+                max(area.left(), min(self.orb.x() - self.width() - 12,
+                                     area.right() - self.width() + 1)),
+                max(area.top(), min(self.orb.y(), area.bottom() - self.height() + 1)),
+            )
+            self.orb_button.setChecked(True)
+        else:
+            self.orb.hide()
         self.show()
         self.raise_()
-        self.activateWindow()
-        self.orb_button.setText("TwinText  ↗")
+        if not self.settings.floating_chat:
+            self.activateWindow()
+            self.orb_button.setText("TwinText  ↗")
+
+    def orb_clicked(self):
+        if self.settings.floating_chat and self.isVisible():
+            self.collapse()
+        else:
+            self.expand()
 
     def collapse(self):
         if self.quitting:
             return
         self.hide()
         self.orb.show()
+        self.orb_button.setChecked(False)
 
     def clear_cache(self):
         try:
@@ -791,11 +844,13 @@ class Companion(QWidget):
         self.sessions.setPlaceholderText(self.t("manual"))
         self.sessions.blockSignals(False)
         self.text = text
+        self.reply_id = None
         self.translate_current()
 
     def select_reply(self, index):
         if index >= 0 and index < len(self.rows):
             self.text = self.rows[index]["text"]
+            self.reply_id = self.rows[index]["id"] if self.settings.floating_chat else None
             self.translate_current()
 
     def translate_current(self):
@@ -804,6 +859,17 @@ class Companion(QWidget):
         self.last_result = None
         self.copy_button.setEnabled(bool(self.text))
         self.reader.setMarkdown(self.text or self.t("empty"))
+        self.pending_translation = (
+            self.reply_id, self.settings.provider, self.settings.source, self.settings.target,
+        )
+        saved = (self.inbox.translation(*self.pending_translation)
+                 if self.reply_id is not None else None)
+        if saved:
+            self.last_result = saved
+            self.render_result()
+            self.status_key = "ready"
+            self.update_status()
+            return
         if self.text and self.settings.mode != "original":
             self.status_key = "working"
             self.translator.submit(
@@ -822,7 +888,8 @@ class Companion(QWidget):
         self.reader.setMarkdown(display_text(self.last_result, self.settings.mode))
 
     def copy(self):
-        text = display_text(self.last_result, self.settings.mode) if self.last_result else self.text
+        text = (display_text(self.last_result, self.settings.mode)
+                if self.last_result and not self.settings.floating_chat else self.text)
         QApplication.clipboard().setText(text)
 
     def clear(self):
@@ -831,6 +898,7 @@ class Companion(QWidget):
         self.cancel_translation()
         self.text = ""
         self.last_result = None
+        self.reply_id = None
         self.rows = []
         self.ids = ()
         self.sessions.clear()
@@ -853,21 +921,28 @@ class Companion(QWidget):
             if activation != self.activation:
                 self.activation = activation
                 self.expand()
-            rows = self.inbox.replies()
+            rows = self.inbox.history() if self.settings.floating_chat else self.inbox.replies()
             ids = tuple(row["id"] for row in rows)
             if ids != self.ids:
                 self.rows, self.ids = rows, ids
                 self.sessions.blockSignals(True)
                 self.sessions.clear()
                 for row in rows:
-                    self.sessions.addItem(f"{self.t('codex')} · {row['session'][:12]}", row["id"])
+                    label = f"{self.t('codex')} · {row['session'][:12]}"
+                    if self.settings.floating_chat:
+                        created = datetime.fromtimestamp(row["created"]).strftime("%m-%d %H:%M")
+                        label += " · " + created + " · " + row["text"].splitlines()[0][:40]
+                    self.sessions.addItem(label, row["id"])
                 self.sessions.blockSignals(False)
                 if rows:
                     self.select_reply(0)
                     if self.orb.isVisible():
-                        self.orb_button.setText("TwinText  ●")
+                        self.orb_button.setText(
+                            "T" if self.settings.floating_chat else "TwinText  ●"
+                        )
                 else:
                     self.text = ""
+                    self.reply_id = None
                     self.translate_current()
             while True:
                 try:
@@ -881,6 +956,8 @@ class Companion(QWidget):
                     self.status.setText(self.t("error") + ": " + error)
                 else:
                     self.last_result = result
+                    if self.pending_translation and self.pending_translation[0] is not None:
+                        self.inbox.save_translation(*self.pending_translation, result)
                     self.render_result()
                     self.status_key = "ready"
                     self.update_status()
@@ -908,13 +985,15 @@ QFrame#orbPanel QWidget { background: transparent; }
 QPushButton#orbExpand, QPushButton#orbQuit { background: transparent; color: #f0fff8; border: none;
 border-radius: 18px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
 QPushButton#orbExpand:hover, QPushButton#orbQuit:hover { background: #285647; }
+QPushButton#orbExpand:checked { background: #2f7965; }
 QPushButton#orbQuit { padding: 0; font-size: 18px; }
 QCheckBox { padding: 2px; }
 """
 
 
 def run(background=False):
-    if background and load_settings().workflow == "chat":
+    settings = load_settings()
+    if background and settings.workflow == "chat" and not settings.floating_chat:
         return 0
     lock = desktop_lock()
     if lock is None:
@@ -939,9 +1018,14 @@ def run(background=False):
     app.setWindowIcon(QIcon(icon))
     window = Companion()
     try:
-        if window.quitting or (background and window.settings.workflow == "chat"):
+        if window.quitting or (background and window.settings.workflow == "chat"
+                               and not window.settings.floating_chat):
             return 0
-        window.collapse() if background else window.show()
+        if window.settings.floating_chat:
+            area = window.orb.screen().availableGeometry()
+            window.orb.move(area.right() - window.orb.width() - 12,
+                            area.top() + area.height() // 4)
+        window.collapse() if background else window.expand()
         return app.exec()
     finally:
         window.quit()

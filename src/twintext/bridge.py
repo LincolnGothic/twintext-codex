@@ -3,6 +3,7 @@
 No model calls, transcript edits, network listeners, or translated hook output.
 """
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -42,12 +43,24 @@ class Inbox:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS control (id INTEGER PRIMARY KEY, revision INTEGER)"
             )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS history ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, fingerprint TEXT UNIQUE NOT NULL, "
+                "session TEXT NOT NULL, turn TEXT NOT NULL, text TEXT NOT NULL, "
+                "kind TEXT NOT NULL, created REAL NOT NULL)"
+            )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS history_translations ("
+                "reply INTEGER NOT NULL, provider TEXT NOT NULL, source TEXT NOT NULL, "
+                "target TEXT NOT NULL, result TEXT NOT NULL, "
+                "PRIMARY KEY(reply, provider, source, target))"
+            )
             with connection:
                 yield connection
         finally:
             connection.close()
 
-    def publish(self, payload):
+    def publish(self, payload, archive=False):
         if not isinstance(payload, dict) or payload.get("hook_event_name") != "Stop":
             return False
         text = payload.get("last_assistant_message")
@@ -55,12 +68,27 @@ class Inbox:
             return False
         session = str(payload.get("session_id") or "codex")[:256]
         turn = str(payload.get("turn_id") or "")[:256]
+        kind = payload.get("kind", "final")
+        if kind not in ("final", "progress", "question"):
+            return False
         with self.connection() as connection:
+            archived = False
+            if archive:
+                fingerprint = hashlib.sha256(
+                    json.dumps([session, turn, kind, text], ensure_ascii=False).encode("utf-8")
+                ).hexdigest()
+                archived = bool(connection.execute(
+                    "INSERT OR IGNORE INTO history "
+                    "(fingerprint, session, turn, text, kind, created) VALUES (?, ?, ?, ?, ?, ?)",
+                    (fingerprint, session, turn, text, kind, time.time()),
+                ).rowcount)
+            if kind != "final":
+                return archived
             existing = connection.execute(
                 "SELECT turn, text FROM replies WHERE session = ?", (session,)
             ).fetchone()
             if existing and existing["turn"] == turn and existing["text"] == text:
-                return False
+                return archived
             connection.execute("DELETE FROM replies WHERE session = ?", (session,))
             connection.execute(
                 "INSERT INTO replies (session, turn, text, created) VALUES (?, ?, ?, ?)",
@@ -82,6 +110,32 @@ class Inbox:
     def clear(self):
         with self.connection() as connection:
             connection.execute("DELETE FROM replies")
+            connection.execute("DELETE FROM history")
+            connection.execute("DELETE FROM history_translations")
+
+    def history(self):
+        with self.connection() as connection:
+            return [
+                dict(row) for row in connection.execute("SELECT * FROM history ORDER BY id DESC")
+            ]
+
+    def save_translation(self, reply, provider, source, target, result):
+        with self.connection() as connection:
+            # A cleared inbox or stale worker must not recreate deleted history.
+            if connection.execute("SELECT 1 FROM history WHERE id = ?", (reply,)).fetchone():
+                connection.execute(
+                    "INSERT OR REPLACE INTO history_translations VALUES (?, ?, ?, ?, ?)",
+                    (reply, provider, source, target, json.dumps(result, ensure_ascii=False)),
+                )
+
+    def translation(self, reply, provider, source, target):
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT result FROM history_translations "
+                "WHERE reply = ? AND provider = ? AND source = ? AND target = ?",
+                (reply, provider, source, target),
+            ).fetchone()
+            return json.loads(row[0]) if row else None
 
     def activate(self):
         with self.connection() as connection:
@@ -154,9 +208,25 @@ def capture(stream):
             return
         payload = json.loads(raw)
         settings = load_settings()
-        if settings.workflow != "desktop":
+        if settings.workflow != "desktop" and not settings.floating_chat:
             return
-        if settings.enabled and Inbox().publish(payload) and settings.desktop_auto_start:
+        if (settings.enabled and Inbox().publish(payload, archive=settings.floating_chat)
+                and settings.desktop_auto_start):
             launch_desktop(background=True)
     except (TwinTextError, OSError, ValueError, TypeError, sqlite3.Error):
         pass
+
+
+def send_to_reader(text, kind="progress", session_id="codex", turn_id=""):
+    settings = load_settings()
+    if (not settings.floating_chat or not settings.enabled or settings.mode == "original"
+            or (kind == "progress" and settings.response_scope != "all")
+            or (kind == "question" and not settings.translate_questions)):
+        return {"received": False}
+    received = Inbox().publish({
+        "hook_event_name": "Stop", "last_assistant_message": text, "kind": kind,
+        "session_id": session_id, "turn_id": turn_id,
+    }, archive=True)
+    if received and settings.desktop_auto_start:
+        launch_desktop(background=True)
+    return {"received": received}

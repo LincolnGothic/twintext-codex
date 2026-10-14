@@ -24,6 +24,51 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_floating_chat_preferences_and_context_keep_original_messages(self):
+        self.assertEqual(load_settings().chat_presentation, "inline")
+        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
+        instructions = context()
+        self.assertIn("Keep assistant messages in their original language", instructions)
+        self.assertIn("twintext_send_to_reader", instructions)
+        self.assertIn("progress updates", instructions)
+        self.assertIn("question cards", instructions)
+        self.assertNotIn("present its display verbatim", instructions)
+        update_settings(response_scope="final", translate_questions=False)
+        self.assertIn("Do not forward progress updates", context())
+        self.assertIn("Do not forward questions", context())
+        with self.assertRaises(TwinTextError):
+            update_settings(chat_presentation="invalid")
+        self.assertEqual(load_settings().chat_presentation, "floating")
+
+    def test_floating_stop_archives_original_final_answer_and_launches_button(self):
+        update_settings(workflow="chat", chat_presentation="floating", desktop_auto_start=True)
+        text = "Original English `code`.\n"
+        with patch("twintext.bridge.launch_desktop") as launch:
+            capture(io.StringIO(json.dumps(payload(text=text))))
+            capture(io.StringIO(json.dumps(payload(text=text))))
+            launch.assert_called_once_with(background=True)
+        self.assertEqual(Inbox().history()[0]["text"], text)
+
+    def test_local_delivery_preserves_original_and_honors_scope_and_questions(self):
+        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "twintext_send_to_reader", "arguments": {
+                "text": "Which option?\n- Keep `x`\n- Change `x`", "kind": "question",
+                "session_id": "test-chat",
+            },
+        }}
+        result = handle(request, self.service)["result"]
+        self.assertFalse(result["isError"])
+        self.assertTrue(result["structuredContent"]["received"])
+        self.assertNotIn("译:", json.dumps(result, ensure_ascii=False))
+        self.assertEqual(Inbox().history()[0]["kind"], "question")
+        update_settings(translate_questions=False)
+        self.assertFalse(handle(request, self.service)["result"]["structuredContent"]["received"])
+        request["params"]["arguments"]["kind"] = "progress"
+        self.assertTrue(handle(request, self.service)["result"]["structuredContent"]["received"])
+        update_settings(response_scope="final")
+        self.assertFalse(handle(request, self.service)["result"]["structuredContent"]["received"])
+
     def test_legacy_settings_default_to_final_answers_and_translated_questions(self):
         path = self.folder / "settings.json"
         path.write_text('{"workflow":"chat","target":"zh"}', encoding="utf-8")

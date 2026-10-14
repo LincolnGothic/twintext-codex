@@ -10,7 +10,8 @@ try:
     event = request.get("hook_event_name", "UserPromptSubmit")
     runner = Path(__file__).resolve().parents[1] / "scripts/launch.py"
     result = subprocess.run(
-        [sys.executable, str(runner), "context"],
+        [sys.executable, str(runner), "context", "--session-id",
+         str(request.get("session_id") or "codex")[:256]],
         capture_output=True,
         text=True,
         encoding="utf-8",
