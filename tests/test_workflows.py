@@ -86,6 +86,16 @@ class WorkflowTests(unittest.TestCase):
             launch.assert_called_once_with(background=True)
         self.assertEqual(Inbox().history()[0]["text"], text)
 
+    def test_floating_stop_retains_repeated_finals_without_native_turn_id(self):
+        update_settings(workflow="chat", chat_presentation="floating")
+        event = payload(text="The tests passed.")
+        event.pop("turn_id")
+        capture(io.StringIO(json.dumps(event)))
+        capture(io.StringIO(json.dumps(event)))
+        replies = Inbox().history()
+        self.assertEqual(len(replies), 2)
+        self.assertNotEqual(replies[0]["turn"], replies[1]["turn"])
+
     def test_local_delivery_preserves_original_and_honors_scope_and_questions(self):
         update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
         request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {

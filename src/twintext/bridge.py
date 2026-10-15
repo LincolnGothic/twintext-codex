@@ -215,6 +215,8 @@ def capture(stream):
             # Stop has no semantic question boundaries. Selected final prose is
             # delivered explicitly when questions must be excluded.
             return
+        if settings.floating_chat and isinstance(payload, dict) and not payload.get("turn_id"):
+            payload["turn_id"] = uuid.uuid4().hex
         if (settings.enabled and Inbox().publish(payload, archive=settings.floating_chat)
                 and settings.desktop_auto_start):
             launch_desktop(background=True)

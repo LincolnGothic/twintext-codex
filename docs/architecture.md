@@ -46,6 +46,8 @@ use atomic replacement under a native advisory lock: `fcntl` on Linux and
    summaries reach it through `twintext_send_to_reader`, returning only receipt status.
    The context hook supplies session and turn IDs (a generated turn ID when absent).
    Explicit turn IDs deduplicate retries; deliveries without one receive a fresh ID.
+   Floating Stop events without a native turn ID likewise receive a fresh ID;
+   identical finals from separate turns remain in history.
    Delivery still uses normal tool tokens;
    reader translations do not enter model context.
 
