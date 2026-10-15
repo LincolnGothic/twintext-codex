@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -210,6 +211,10 @@ def capture(stream):
         settings = load_settings()
         if settings.workflow != "desktop" and not settings.floating_chat:
             return
+        if settings.floating_chat and not settings.translate_questions:
+            # Stop has no semantic question boundaries. Selected final prose is
+            # delivered explicitly when questions must be excluded.
+            return
         if (settings.enabled and Inbox().publish(payload, archive=settings.floating_chat)
                 and settings.desktop_auto_start):
             launch_desktop(background=True)
@@ -223,10 +228,11 @@ def send_to_reader(text, kind="progress", session_id="codex", turn_id=""):
             or (kind == "progress" and settings.response_scope != "all")
             or (kind == "question" and not settings.translate_questions)):
         return {"received": False}
+    turn_id = turn_id or uuid.uuid4().hex
     received = Inbox().publish({
         "hook_event_name": "Stop", "last_assistant_message": text, "kind": kind,
         "session_id": session_id, "turn_id": turn_id,
     }, archive=True)
     if received and settings.desktop_auto_start:
         launch_desktop(background=True)
-    return {"received": received}
+    return {"received": received, "turn_id": turn_id}

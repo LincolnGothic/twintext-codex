@@ -68,6 +68,7 @@ def parser():
         "context", help="Emit instructions only when Chat workflow is selected"
     )
     context_command.add_argument("--session-id")
+    context_command.add_argument("--turn-id")
     commands.add_parser("capture", help="Receive a Codex Stop event on stdin (no model calls)")
     desktop = commands.add_parser("desktop", help="Open the floating desktop reader")
     desktop.add_argument("--background", action="store_true", help="Start as a compact button")
@@ -163,7 +164,7 @@ def main(argv=None):
             Cache().clear()
             print("Translation cache cleared.")
         elif args.command == "context":
-            print(context(args.session_id))
+            print(context(args.session_id, args.turn_id))
         elif args.command == "models":
             engine = ArgosEngine()
             if args.operation == "list":

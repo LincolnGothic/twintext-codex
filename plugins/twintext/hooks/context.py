@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 try:
@@ -11,7 +12,8 @@ try:
     runner = Path(__file__).resolve().parents[1] / "scripts/launch.py"
     result = subprocess.run(
         [sys.executable, str(runner), "context", "--session-id",
-         str(request.get("session_id") or "codex")[:256]],
+         str(request.get("session_id") or "codex")[:256], "--turn-id",
+         str(request.get("turn_id") or uuid.uuid4().hex)[:256]],
         capture_output=True,
         text=True,
         encoding="utf-8",

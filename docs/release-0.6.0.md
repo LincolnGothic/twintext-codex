@@ -12,10 +12,13 @@ button and reader**, and **Display mode → Bilingual**. Enable **Open floating
 button on new replies**, or open the reader manually. Existing installations
 default to **In conversation**, preserving the previous display.
 
-Final answers use the trusted Stop hook. All-responses progress updates and enabled
+Final answers use the trusted Stop hook while question translation is enabled.
+With questions disabled, Codex forwards only informational final passages through
+the delivery tool, omitting question portions even from mixed replies. All-responses progress updates and enabled
 questions use the new local `twintext_send_to_reader` tool; their original text stays
 in Codex. These deliveries still use normal Codex tool tokens, but no reader
 translation is returned to model context. Question IDs and choice values remain intact.
+Session and turn IDs retain repeated messages across turns while deduplicating retries.
 
 The floating presentation retains each newly received reply and completed
 translation in local history. Older replies remain selectable after a restart and

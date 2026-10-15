@@ -40,9 +40,13 @@ use atomic replacement under a native advisory lock: `fcntl` on Linux and
    translation is part of the selected assistant message or question in the existing chat.
 4. With the default `chat_presentation=inline`, Stop exits without a Desktop capture.
    With `chat_presentation=floating`, assistant text stays original and Stop archives
-   completed final answers for the separate reader. Selected progress and question
+   completed final answers for the separate reader when question translation is enabled.
+   With questions disabled, Stop skips capture and Codex delivers only informational
+   final passages, excluding questions from mixed replies. Selected progress and question
    summaries reach it through `twintext_send_to_reader`, returning only receipt status.
-   The context hook supplies the session ID. Delivery still uses normal tool tokens;
+   The context hook supplies session and turn IDs (a generated turn ID when absent).
+   Explicit turn IDs deduplicate retries; deliveries without one receive a fresh ID.
+   Delivery still uses normal tool tokens;
    reader translations do not enter model context.
 
 Floating Chat keeps originals in the inbox's separate `history` table and completed

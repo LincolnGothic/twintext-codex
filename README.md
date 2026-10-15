@@ -92,7 +92,9 @@ Keep **Translation location → Codex chat**; start a new chat after switching p
 - New answers stay in their original language inside Codex. Its Copy button
   therefore excludes translations. The reader's **Copy original** copies the
   exact original Markdown, even while bilingual text is visible.
-- Final answers arrive through Stop. With **All responses**, selected progress
+- Final answers arrive through Stop when question translation is enabled. With
+  questions disabled, Codex forwards only informational final passages through
+  the delivery tool, excluding questions even in mixed replies. With **All responses**, selected progress
   updates are forwarded to the reader; enabled questions and answer-choice
   summaries follow their independent setting. These deliveries require Codex
   to follow the plugin instructions and use its local delivery tool.
@@ -278,8 +280,9 @@ claimed negligible. Desktop's automatic capture and translation make no addition
 LLM requests or translated-context additions. Asking Codex to open, configure or
 manually translate with TwinText still uses normal Codex tokens in either style.
 Floating Chat also keeps reader translations outside model context. Final capture
-uses Stop without a translation tool call; progress/question delivery still uses
-normal Codex tool tokens when selected.
+uses Stop without a translation tool call when question translation is enabled.
+With questions disabled, selected final passages use the delivery tool instead.
+Final, progress and question deliveries use normal Codex tool tokens when selected.
 
 TwinText has no telemetry, background clipboard monitoring, OCR or automatic provider
 fallback. Azure sends source text to Microsoft Azure Translator; screenshots are
@@ -364,7 +367,7 @@ On Windows, use `.venv\Scripts\python.exe` and `.venv\Scripts\ruff.exe`; set
 `$env:QT_QPA_PLATFORM = 'offscreen'` before the Qt tests. The development install
 above omits the optional engine; add the `engine` extra for real-model work.
 
-Version 0.6.0 includes **120 regression tests** for Windows and Linux with Python
+Version 0.6.0 includes **123 regression tests** for Windows and Linux with Python
 3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
 native hooks, real Offline English→Chinese tables, Qt rendering and preservation
 of settings/models on upgrade. [Release notes](docs/release-0.6.0.md).

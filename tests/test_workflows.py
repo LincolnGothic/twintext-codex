@@ -14,7 +14,7 @@ from test_bridge import payload
 from test_core import FakeEngine
 from test_markdown_formats import TABLE
 
-from twintext.bridge import Inbox, capture
+from twintext.bridge import Inbox, capture, send_to_reader
 from twintext.config import TwinTextError, config_dir, data_dir, load_settings, update_settings
 from twintext.locking import acquire_lock
 from twintext.mcp import handle
@@ -24,6 +24,43 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_floating_questions_disabled_selects_information_from_final(self):
+        update_settings(workflow="chat", chat_presentation="floating", translate_questions=False)
+        for text in ("Which option?", "The tests passed. Which option?"):
+            capture(io.StringIO(json.dumps(payload(text=text))))
+        self.assertEqual(Inbox().history(), [])
+        self.assertTrue(send_to_reader("The tests passed.", kind="final")["received"])
+        self.assertEqual(Inbox().history()[0]["text"], "The tests passed.")
+        self.assertIn("kind=final", context())
+        self.assertIn("Exclude question passages", context())
+
+    def test_reader_deliveries_deduplicate_retries_but_keep_separate_turns(self):
+        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
+        self.assertTrue(send_to_reader("Checking.", turn_id="first")["received"])
+        self.assertFalse(send_to_reader("Checking.", turn_id="first")["received"])
+        self.assertTrue(send_to_reader("Checking.", turn_id="second")["received"])
+        first = send_to_reader("Checking.")
+        second = send_to_reader("Checking.")
+        self.assertNotEqual(first["turn_id"], second["turn_id"])
+        self.assertEqual(len(Inbox().history()), 4)
+        self.assertIn('turn_id="second"', context("chat", "second"))
+
+    def test_floating_hook_supplies_native_or_generated_turn_id(self):
+        update_settings(workflow="chat", chat_presentation="floating")
+        hook = ROOT / "plugins/twintext/hooks/context.py"
+        with patch.dict(os.environ, {"TWINTEXT_PYTHON": sys.executable}):
+            outputs = []
+            for turn in ("native-turn", None, None):
+                result = subprocess.run(
+                    [sys.executable, str(hook)],
+                    input=json.dumps({"session_id": "chat", "turn_id": turn}),
+                    capture_output=True, text=True, check=True, timeout=10,
+                )
+                outputs.append(json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
+        self.assertIn('turn_id="native-turn"', outputs[0])
+        self.assertIn('turn_id="', outputs[1])
+        self.assertNotEqual(outputs[1], outputs[2])
+
     def test_floating_chat_preferences_and_context_keep_original_messages(self):
         self.assertEqual(load_settings().chat_presentation, "inline")
         update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
