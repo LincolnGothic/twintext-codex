@@ -13,6 +13,7 @@ LANGUAGES = {"en": "English", "zh": "Chinese", "ja": "Japanese", "fr": "French",
 MODES = ("bilingual", "translated", "original")
 WORKFLOWS = ("desktop", "chat")
 RESPONSE_SCOPES = ("final", "all")
+CHAT_PRESENTATIONS = ("inline", "floating")
 PROVIDERS = ("offline", "azure")
 
 
@@ -63,6 +64,11 @@ class Settings:
     workflow: str = "desktop"
     response_scope: str = "final"
     translate_questions: bool = True
+    chat_presentation: str = "inline"
+
+    @property
+    def floating_chat(self):
+        return self.workflow == "chat" and self.chat_presentation == "floating"
 
     def validate(self):
         if self.provider not in PROVIDERS:
@@ -71,6 +77,8 @@ class Settings:
             raise TwinTextError("Workflow must be desktop or chat.")
         if self.response_scope not in RESPONSE_SCOPES:
             raise TwinTextError("Response scope must be final or all.")
+        if self.chat_presentation not in CHAT_PRESENTATIONS:
+            raise TwinTextError("Chat presentation must be inline or floating.")
         if self.source not in ("auto", *LANGUAGES):
             raise TwinTextError("Source must be auto, en, zh, ja, fr, or es.")
         if self.target not in LANGUAGES:

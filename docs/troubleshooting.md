@@ -32,8 +32,9 @@ then restart Codex and review/trust its hooks. Rerunning the runtime installer
 registers the plugin but does not automatically install/enable it in Codex or grant
 hook trust. Upgrades can add hooks that require another review.
 
-Check **Translation location**. In **Chat** mode, Stop capture is inactive, so an
-empty Desktop inbox is expected. In **Desktop** mode, enable **Receive Codex replies**.
+Check **Translation location** and **Chat presentation**. With **In conversation**,
+Stop capture is inactive, so an empty Desktop inbox is expected. **Floating button
+and reader** archives new Chat replies separately. In **Desktop** mode, enable **Receive Codex replies**.
 Only newly completed replies are captured; previous messages and streaming fragments
 are not imported. Paste/Translate works independently of automatic capture.
 
@@ -49,6 +50,14 @@ that differs from the reply's source. Start a new Codex chat after switching fro
 Desktop so SessionStart/UserPromptSubmit supplies the selected workflow's instructions.
 Automatic Chat translation depends on Codex following those instructions and
 calling the available `twintext_translate` tool; it is not a native renderer overlay.
+
+For **Floating button and reader**, new messages stay original in Codex. Final
+answers are captured by Stop; selected progress updates and questions use
+`twintext_send_to_reader` (CLI fallback: `twintext send-to-reader`). Enable **Open
+floating button on new replies** or open the reader manually, then click **T**.
+Click it again to hide translations. Drag the button beside Codex; the reader does
+not attach to or follow the Codex window automatically. Previously received replies
+are available in the reader selector; older conversation messages are not imported.
 
 When switching back to Desktop, start a new chat too. Old Chat instructions can
 remain in an existing conversation even when later Desktop hooks return no context.

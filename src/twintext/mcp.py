@@ -6,6 +6,7 @@ import sys
 from twintext import __version__
 from twintext.cache import Cache
 from twintext.config import (
+    CHAT_PRESENTATIONS,
     LANGUAGES,
     MODES,
     PROVIDERS,
@@ -35,7 +36,9 @@ def tools():
             "annotations": {
                 "readOnlyHint": read_only,
                 "destructiveHint": False,
-                "openWorldHint": name in ("twintext_install_models", "twintext_translate"),
+                "openWorldHint": name in (
+                    "twintext_install_models", "twintext_translate", "twintext_send_to_reader",
+                ),
             },
         }
         if ui:
@@ -58,6 +61,17 @@ def tools():
         ),
         tool("twintext_status", "Read TwinText settings and installed offline models.", {}),
         tool(
+            "twintext_send_to_reader",
+            "Deliver original Markdown to the local floating Chat reader. "
+            "The selected provider translates in the reader; no translation is returned to "
+            "model context. Honors response scope, question and auto-start settings.",
+            {"text": {"type": "string", "maxLength": 100000},
+             "kind": {"type": "string", "enum": ["final", "progress", "question"]},
+             "session_id": {"type": "string", "maxLength": 256},
+             "turn_id": {"type": "string", "maxLength": 256}},
+            required=("text",), read_only=False,
+        ),
+        tool(
             "twintext_set_settings",
             "Save TwinText translation and display preferences.",
             {
@@ -65,6 +79,7 @@ def tools():
                 "source": {"type": "string", "enum": ["auto", *LANGUAGES]},
                 "workflow": {"type": "string", "enum": list(WORKFLOWS)},
                 "response_scope": {"type": "string", "enum": list(RESPONSE_SCOPES)},
+                "chat_presentation": {"type": "string", "enum": list(CHAT_PRESENTATIONS)},
                 "translate_questions": {"type": "boolean"},
                 "target": LANGUAGE_SCHEMA,
                 "mode": {"type": "string", "enum": list(MODES)},
@@ -122,8 +137,14 @@ def call_tool(name, arguments, service):
             raise TwinTextError(f"{key} must be true or false.")
         if "enum" in field and value not in field["enum"]:
             raise TwinTextError(f"Invalid {key}.")
+        if "maxLength" in field and len(value) > field["maxLength"]:
+            raise TwinTextError(f"{key} exceeds {field['maxLength']} characters.")
     if name == "twintext_translate":
         return service.translate(**arguments)
+    if name == "twintext_send_to_reader":
+        from twintext.bridge import send_to_reader
+
+        return send_to_reader(**arguments)
     if name == "twintext_open_desktop":
         from twintext.bridge import launch_desktop
 

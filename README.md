@@ -9,7 +9,7 @@ TwinText interface language independently, or let Automatic follow the available
 host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 
-[Download 0.5.1](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.5.1) ·
+[Download 0.6.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.6.0) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
@@ -17,11 +17,11 @@ Microsoft Azure Translator is an optional provider using your own credentials.
 
 | Style | What you see | Codex token use |
 | --- | --- | --- |
-| **Chat** | Selected replies and questions with bilingual or translated-only text inside the existing Codex chat | Translation tool calls, their results and displayed translations use normal Codex tokens |
+| **Chat** | Selected replies and questions translated in the conversation, or in an optional floating Chat reader | Inline translations use normal tool/context/output tokens; floating progress/question delivery uses tool tokens without translated-context additions |
 | **Desktop** | Completed replies in a separate floating window, with a compact draggable button | Automatic translation makes no additional LLM requests and returns no translations to model context |
 
 Chat preserves the original **0.1** experience; Desktop preserves the **0.2.2**
-experience. Version **0.5.1** maintains both through a shared translation engine,
+experience. Version **0.6.0** maintains both through a shared translation engine,
 Markdown parser, language packs and settings. The old releases are historical
 versions; new fixes apply to both styles in the current version.
 
@@ -34,7 +34,8 @@ style only on a first installation; upgrades preserve the existing choice.
 
 Read the original reply and its translation **inside the Codex conversation**.
 Choose **Bilingual** to show both languages, or **Translation only** to show the
-translated text. Chat does not automatically open a floating reader.
+translated text. The default **In conversation** presentation does not automatically
+open a floating reader.
 
 ![Illustrated Codex Chat example: an English progress update followed by a bilingual English–Chinese final reply](docs/chat-example.svg)
 
@@ -77,6 +78,39 @@ language packs installed; install models before using Offline translation.*
 
 </details>
 
+#### Floating Chat presentation: copy only the original
+
+Prefer a small translation button beside Codex? Choose **Chat presentation →
+Floating button and reader** and **Display mode → Bilingual**. Enable **Open
+floating button on new replies** in native settings, or open the reader manually.
+Keep **Translation location → Codex chat**; start a new chat after switching presentation.
+
+- Drag the small **T** button beside the conversation. Click once to show the
+  bilingual reader beside it; click again to hide it and leave the original
+  Codex conversation visible. **×** quits both windows. The button does not
+  automatically attach to or track the Codex window.
+- New answers stay in their original language inside Codex. Its Copy button
+  therefore excludes translations. The reader's **Copy original** copies the
+  exact original Markdown, even while bilingual text is visible.
+- Final answers arrive through Stop when question translation is enabled. With
+  questions disabled, Codex forwards only informational final passages through
+  the delivery tool, excluding questions even in mixed replies. With **All responses**, selected progress
+  updates are forwarded to the reader; enabled questions and answer-choice
+  summaries follow their independent setting. These deliveries require Codex
+  to follow the plugin instructions and use its local delivery tool.
+- Each newly received reply and completed translation remains in local history,
+  selectable after restarting the reader or clearing the translation cache.
+  History has no automatic expiry; **Clear received replies** removes it.
+  Previous chat messages remain unchanged and are not automatically imported.
+
+![Floating Chat reader with a bilingual English–Chinese reply, a saved-reply selector and Copy original](docs/floating-chat.png)
+
+*Native reader preview using real Offline translations and isolated sample history.
+The original answer remains in Codex; this window displays the translation separately.*
+
+CLI: `twintext settings --workflow chat --chat-presentation floating --mode bilingual --desktop-auto-start true`.
+Use `--chat-presentation inline` to return to translations in the conversation.
+
 ### Desktop
 
 Read completed replies in a **separate floating window**. Collapse it to the
@@ -96,8 +130,8 @@ Choose your operating system and preferred first-install style:
 
 | Operating system | Chat default | Floating-window default | Checksums |
 | --- | --- | --- | --- |
-| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/TwinText-0.5.1-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/TwinText-0.5.1-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/SHA256SUMS-linux.txt) |
-| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/TwinText-0.5.1-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/TwinText-0.5.1-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.5.1/SHA256SUMS-windows.txt) |
+| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/TwinText-0.6.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/TwinText-0.6.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/SHA256SUMS-linux.txt) |
+| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/TwinText-0.6.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/TwinText-0.6.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/SHA256SUMS-windows.txt) |
 
 Each ZIP supports **both** styles. Install one package, then switch in settings.
 Check its SHA-256 hash against the matching checksum file before installation.
@@ -213,8 +247,8 @@ table. See [format coverage and limits](docs/output-formats.md).
   drag the button to move it; click the button to expand. A dot indicates a new reply.
   **×** on the compact button or reader quits the reader; **−** collapses it.
   Closing either window also quits. Auto-start preferences are preserved.
-- Switching to **Codex chat** closes an already-running floating reader, including
-  changes made from the web/embedded settings panel. Chat never launches the
+- Switching to **Codex chat → In conversation** closes an already-running reader, including
+  changes made from the web/embedded settings panel. Inline Chat never launches the
   floating button automatically; explicitly opening manual preview/settings is available.
 - Scrolling over native dropdowns scrolls the preferences panel without changing
   selections. Use clicks or keyboard keys to change an option.
@@ -240,15 +274,20 @@ Argos/CTranslate2 inference runs on your CPU after models are installed. Setup a
 model downloads use internet access and disk space; reading translations uses local
 CPU/RAM. Ordinary Codex access and usage remain subject to your existing plan.
 
-Chat translation adds normal tool/context/output token usage. Its overhead grows
+Inline Chat translation adds normal tool/context/output token usage. Its overhead grows
 with reply length and can be substantial for long bilingual replies; it is not
 claimed negligible. Desktop's automatic capture and translation make no additional
 LLM requests or translated-context additions. Asking Codex to open, configure or
 manually translate with TwinText still uses normal Codex tokens in either style.
+Floating Chat also keeps reader translations outside model context. Final capture
+uses Stop without a translation tool call when question translation is enabled.
+With questions disabled, selected final passages use the delivery tool instead.
+Final, progress and question deliveries use normal Codex tool tokens when selected.
 
 TwinText has no telemetry, background clipboard monitoring, OCR or automatic provider
 fallback. Azure sends source text to Microsoft Azure Translator; screenshots are
-never sent to Azure. Desktop keeps original replies on disk locally. In Chat mode,
+never sent to Azure. Desktop and floating Chat keep original replies on disk locally.
+Floating Chat also retains completed translations in its local history. In inline Chat mode,
 original/translated text enters the Codex conversation; offline inference does not
 make the Codex chat itself offline. Rendered Markdown images are not fetched and
 links are not opened automatically. Codex menus, screenshots, PDFs and videos are
@@ -309,6 +348,9 @@ removes them. The Desktop inbox separately retains one latest original reply per
 chat, up to 24 chats, even when translation caching is disabled. **Clear received
 replies** clears the inbox without removing preferences, models or cached translations.
 Clearing normally completes immediately; empty SQLite files can remain.
+Floating Chat history uses separate tables in the same inbox database. It retains
+every captured reply and completed translation until **Clear received replies**;
+the fragment cache's 10,000-entry limit does not expire that history.
 
 ## Development and verification
 
@@ -325,14 +367,14 @@ On Windows, use `.venv\Scripts\python.exe` and `.venv\Scripts\ruff.exe`; set
 `$env:QT_QPA_PLATFORM = 'offscreen'` before the Qt tests. The development install
 above omits the optional engine; add the `engine` extra for real-model work.
 
-Version 0.5.1 includes **112 regression tests** for Windows and Linux with Python
+Version 0.6.0 includes **124 regression tests** for Windows and Linux with Python
 3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
 native hooks, real Offline English→Chinese tables, Qt rendering and preservation
-of settings/models on upgrade. [Release notes](docs/release-0.5.1.md).
+of settings/models on upgrade. [Release notes](docs/release-0.6.0.md).
 Interactive Codex sessions, hook trust and compositor behavior still require host testing.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.5.1.md). Report bugs with your OS, Python/Codex/
+and [release notes](docs/release-0.6.0.md). Report bugs with your OS, Python/Codex/
 TwinText versions, style, language pair and a sanitized Markdown example; avoid
 posting private conversations or local databases.
 

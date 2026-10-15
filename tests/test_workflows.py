@@ -14,7 +14,7 @@ from test_bridge import payload
 from test_core import FakeEngine
 from test_markdown_formats import TABLE
 
-from twintext.bridge import Inbox, capture
+from twintext.bridge import Inbox, capture, send_to_reader
 from twintext.config import TwinTextError, config_dir, data_dir, load_settings, update_settings
 from twintext.locking import acquire_lock
 from twintext.mcp import handle
@@ -24,6 +24,98 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_floating_questions_disabled_selects_information_from_final(self):
+        update_settings(workflow="chat", chat_presentation="floating", translate_questions=False)
+        for text in ("Which option?", "The tests passed. Which option?"):
+            capture(io.StringIO(json.dumps(payload(text=text))))
+        self.assertEqual(Inbox().history(), [])
+        self.assertTrue(send_to_reader("The tests passed.", kind="final")["received"])
+        self.assertEqual(Inbox().history()[0]["text"], "The tests passed.")
+        self.assertIn("kind=final", context())
+        self.assertIn("Exclude question passages", context())
+
+    def test_reader_deliveries_deduplicate_retries_but_keep_separate_turns(self):
+        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
+        self.assertTrue(send_to_reader("Checking.", turn_id="first")["received"])
+        self.assertFalse(send_to_reader("Checking.", turn_id="first")["received"])
+        self.assertTrue(send_to_reader("Checking.", turn_id="second")["received"])
+        first = send_to_reader("Checking.")
+        second = send_to_reader("Checking.")
+        self.assertNotEqual(first["turn_id"], second["turn_id"])
+        self.assertEqual(len(Inbox().history()), 4)
+        self.assertIn('turn_id="second"', context("chat", "second"))
+
+    def test_floating_hook_supplies_native_or_generated_turn_id(self):
+        update_settings(workflow="chat", chat_presentation="floating")
+        hook = ROOT / "plugins/twintext/hooks/context.py"
+        with patch.dict(os.environ, {"TWINTEXT_PYTHON": sys.executable}):
+            outputs = []
+            for turn in ("native-turn", None, None):
+                result = subprocess.run(
+                    [sys.executable, str(hook)],
+                    input=json.dumps({"session_id": "chat", "turn_id": turn}),
+                    capture_output=True, text=True, check=True, timeout=10,
+                )
+                outputs.append(json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
+        self.assertIn('turn_id="native-turn"', outputs[0])
+        self.assertIn('turn_id="', outputs[1])
+        self.assertNotEqual(outputs[1], outputs[2])
+
+    def test_floating_chat_preferences_and_context_keep_original_messages(self):
+        self.assertEqual(load_settings().chat_presentation, "inline")
+        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
+        instructions = context()
+        self.assertIn("Keep assistant messages in their original language", instructions)
+        self.assertIn("twintext_send_to_reader", instructions)
+        self.assertIn("progress updates", instructions)
+        self.assertIn("question cards", instructions)
+        self.assertNotIn("present its display verbatim", instructions)
+        update_settings(response_scope="final", translate_questions=False)
+        self.assertIn("Do not forward progress updates", context())
+        self.assertIn("Do not forward questions", context())
+        with self.assertRaises(TwinTextError):
+            update_settings(chat_presentation="invalid")
+        self.assertEqual(load_settings().chat_presentation, "floating")
+
+    def test_floating_stop_archives_original_final_answer_and_launches_button(self):
+        update_settings(workflow="chat", chat_presentation="floating", desktop_auto_start=True)
+        text = "Original English `code`.\n"
+        with patch("twintext.bridge.launch_desktop") as launch:
+            capture(io.StringIO(json.dumps(payload(text=text))))
+            capture(io.StringIO(json.dumps(payload(text=text))))
+            launch.assert_called_once_with(background=True)
+        self.assertEqual(Inbox().history()[0]["text"], text)
+
+    def test_floating_stop_retains_repeated_finals_without_native_turn_id(self):
+        update_settings(workflow="chat", chat_presentation="floating")
+        event = payload(text="The tests passed.")
+        event.pop("turn_id")
+        capture(io.StringIO(json.dumps(event)))
+        capture(io.StringIO(json.dumps(event)))
+        replies = Inbox().history()
+        self.assertEqual(len(replies), 2)
+        self.assertNotEqual(replies[0]["turn"], replies[1]["turn"])
+
+    def test_local_delivery_preserves_original_and_honors_scope_and_questions(self):
+        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "twintext_send_to_reader", "arguments": {
+                "text": "Which option?\n- Keep `x`\n- Change `x`", "kind": "question",
+                "session_id": "test-chat",
+            },
+        }}
+        result = handle(request, self.service)["result"]
+        self.assertFalse(result["isError"])
+        self.assertTrue(result["structuredContent"]["received"])
+        self.assertNotIn("译:", json.dumps(result, ensure_ascii=False))
+        self.assertEqual(Inbox().history()[0]["kind"], "question")
+        update_settings(translate_questions=False)
+        self.assertFalse(handle(request, self.service)["result"]["structuredContent"]["received"])
+        request["params"]["arguments"]["kind"] = "progress"
+        self.assertTrue(handle(request, self.service)["result"]["structuredContent"]["received"])
+        update_settings(response_scope="final")
+        self.assertFalse(handle(request, self.service)["result"]["structuredContent"]["received"])
+
     def test_legacy_settings_default_to_final_answers_and_translated_questions(self):
         path = self.folder / "settings.json"
         path.write_text('{"workflow":"chat","target":"zh"}', encoding="utf-8")

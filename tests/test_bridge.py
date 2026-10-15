@@ -25,6 +25,23 @@ def payload(session="one", turn="first", text="Hello `npm test`."):
 
 
 class BridgeTests(unittest.TestCase):
+    def test_floating_history_keeps_each_reply_and_translation_after_restart(self):
+        self.inbox.publish(payload(text="First"), archive=True)
+        self.inbox.publish(payload(turn="next", text="Second"), archive=True)
+        rows = self.inbox.history()
+        self.assertEqual([row["text"] for row in rows], ["Second", "First"])
+        result = {"original": "First", "translation": "第一条", "blocks": []}
+        self.inbox.save_translation(rows[1]["id"], "offline", "auto", "zh", result)
+        reopened = Inbox()
+        self.assertEqual(len(reopened.history()), 2)
+        self.assertEqual(reopened.translation(rows[1]["id"], "offline", "auto", "zh"), result)
+        self.assertIsNone(reopened.translation(rows[1]["id"], "offline", "auto", "ja"))
+        self.inbox.publish(payload(session="other", text="Other"), archive=True)
+        self.assertEqual(len(self.inbox.history()), 3)
+        self.inbox.clear()
+        self.assertEqual(reopened.history(), [])
+        self.assertIsNone(reopened.translation(rows[1]["id"], "offline", "auto", "zh"))
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
