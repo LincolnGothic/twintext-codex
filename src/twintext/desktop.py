@@ -34,6 +34,7 @@ from twintext.config import (
     MODES,
     PROVIDERS,
     RESPONSE_SCOPES,
+    TRANSLATION_LANGUAGES,
     WORKFLOWS,
     TwinTextError,
     load_settings,
@@ -321,6 +322,32 @@ for _language, _labels in {
     )))
 
 
+for _language, _labels in {
+    "en": ("Translation provider", "Google Free (experimental)", "Chinese (Traditional)",
+           "Uses a keyless interface not officially supported by Google Cloud. It may be rate "
+           "limited, fail or change; availability, translation quality and free quota are not "
+           "guaranteed. Text to translate is sent to Google."),
+    "zh": ("翻译引擎", "Google 免费翻译（实验性）", "中文（繁体）",
+           "使用非 Google Cloud 正式支持的免 Key 接口，可能限流、失效或变更；"
+           "不保证可用性、翻译质量或免费额度。待翻译文本会发送至 Google。"),
+    "ja": ("翻訳エンジン", "Google 無料翻訳（試験的）", "中国語（繁体字）",
+           "Google Cloud が正式にサポートしないキー不要のインターフェースを使用します。"
+           "制限、停止、変更の可能性があり、"
+           "可用性、翻訳品質、無料枠は保証されません。翻訳するテキストは Google に送信されます。"),
+    "fr": ("Moteur de traduction", "Google gratuit (expérimental)", "Chinois (traditionnel)",
+           "Interface sans clé non officiellement prise en charge par Google Cloud : elle peut "
+           "être limitée, indisponible ou modifiée. Disponibilité, qualité et quota gratuit non "
+           "garantis. Le texte à traduire est envoyé à Google."),
+    "es": ("Motor de traducción", "Google gratis (experimental)", "Chino (tradicional)",
+           "Interfaz sin clave sin soporte oficial de Google Cloud. Puede limitarse, fallar o "
+           "cambiar; no se garantizan disponibilidad, calidad ni cuota gratuita. El texto a "
+           "traducir se envía a Google."),
+}.items():
+    WORDS[_language].update(dict(zip(
+        ("provider", "google-free", "zh-TW", "google_notice"), _labels, strict=True,
+    )))
+
+
 def display_text(result, mode):
     if mode == "original":
         return result["original"]
@@ -393,7 +420,7 @@ class DragHandle(Header):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#9ec8b9"))
+        painter.setBrush(QColor("#becaf7"))
         for x in (11, 18):
             for y in (11, 18, 25):
                 painter.drawEllipse(x - 2, y - 2, 4, 4)
@@ -497,6 +524,10 @@ class Companion(QWidget):
         self.azure_status = QLabel()
         self.azure_status.setWordWrap(True)
         form.addRow(self.azure_status)
+        self.google_notice = QLabel()
+        self.google_notice.setWordWrap(True)
+        self.google_notice.setObjectName("muted")
+        form.insertRow(1, self.google_notice)
         self.checks = {}
         for key in ("enabled", "translate_questions", "cache", "start", "pin"):
             box = QCheckBox()
@@ -521,8 +552,8 @@ class Companion(QWidget):
         self.reader.setOpenExternalLinks(False)
         self.reader.setObjectName("reader")
         self.reader.document().setDefaultStyleSheet(
-            "pre { background: #e9efed; padding: 10px; } "
-            "a { color: #196d5d; } blockquote { color: #536861; }"
+            "pre { background: #edf0fb; padding: 10px; } "
+            "a { color: #4f46c8; } blockquote { color: #526482; }"
         )
         layout.addWidget(self.reader, 1)
         self.editor = QPlainTextEdit()
@@ -628,8 +659,11 @@ class Companion(QWidget):
         self.orb.setFixedSize(84 if self.settings.floating_chat else 196, 48)
         self.offline.setText(
             self.t("offline") if self.settings.provider == "offline"
+            else self.t("google-free") if self.settings.provider == "google-free"
             else "Azure — source text is sent to Microsoft; screenshots are not sent."
         )
+        self.google_notice.setText(self.t("google_notice"))
+        self.google_notice.setVisible(self.settings.provider == "google-free")
         azure = self.settings.provider == "azure"
         self.azure_button.setVisible(azure)
         self.azure_status.setVisible(azure)
@@ -661,16 +695,19 @@ class Companion(QWidget):
             codes = (PROVIDERS if key == "provider" else WORKFLOWS if key == "workflow"
                      else CHAT_PRESENTATIONS if key == "chat_presentation"
                      else RESPONSE_SCOPES if key == "response_scope"
-                     else MODES if key == "mode" else list(LANGUAGES))
+                     else MODES if key == "mode"
+                     else list(TRANSLATION_LANGUAGES) if key in ("source", "target")
+                     and self.settings.provider == "google-free" else list(LANGUAGES))
             if key in ("source", "ui"):
                 codes = ["auto", *codes]
             for code in codes:
-                label = ("Offline — Argos" if code == "offline" else "Microsoft Azure Translator")
+                label = (self.t("google-free") if code == "google-free" else
+                         "Offline — Argos" if code == "offline" else "Microsoft Azure Translator")
                 combo.addItem(label if key == "provider" else self.t(code), code)
             field = "ui_language" if key == "ui" else key
             combo.setCurrentIndex(combo.findData(getattr(self.settings, field)))
             combo.blockSignals(False)
-            self.labels[key].setText("Translation provider" if key == "provider" else self.t(key))
+            self.labels[key].setText(self.t(key))
         for key, box in self.checks.items():
             field = {"start": "desktop_auto_start", "pin": "always_on_top"}.get(key, key)
             box.blockSignals(True)
@@ -966,26 +1003,26 @@ class Companion(QWidget):
 
 
 STYLE = """
-QWidget { background: #f7faf8; color: #20352e; font-size: 13px; }
-QLabel#brand { font-size: 23px; font-weight: 700; color: #196d5d; }
-QLabel#muted { color: #60766d; font-size: 12px; }
-QPushButton { background: #e7f0eb; border: 1px solid #d2e1d8; border-radius: 8px;
+QWidget { background: #f4f6fc; color: #202c46; font-size: 13px; }
+QLabel#brand { font-size: 23px; font-weight: 700; color: #4f46c8; }
+QLabel#muted { color: #60708c; font-size: 12px; }
+QPushButton { background: #edf0fc; border: 1px solid #d5dced; border-radius: 8px;
 padding: 8px 12px; }
-QPushButton:hover { background: #d6e8df; }
-QPushButton:disabled { color: #91a39a; }
-QComboBox, QPlainTextEdit { background: white; border: 1px solid #d2e1d8;
+QPushButton:hover { background: #e0e6fb; }
+QPushButton:disabled { color: #71809a; }
+QComboBox, QPlainTextEdit { background: white; border: 1px solid #d5dced;
 border-radius: 7px; padding: 6px; }
 QComboBox { min-height: 20px; }
 QPushButton { min-height: 16px; }
-QTextBrowser#reader { background: white; border: 1px solid #d2e1d8; border-radius: 12px;
+QTextBrowser#reader { background: white; border: 1px solid #d5dced; border-radius: 12px;
 padding: 14px; font-size: 14px; }
-QFrame#preferences { background: #edf4ef; border-radius: 9px; }
-QFrame#orbPanel { background: #173f35; border: 1px solid #396757; border-radius: 23px; }
+QFrame#preferences { background: #eaf0fb; border-radius: 9px; }
+QFrame#orbPanel { background: #29355c; border: 1px solid #56658c; border-radius: 23px; }
 QFrame#orbPanel QWidget { background: transparent; }
-QPushButton#orbExpand, QPushButton#orbQuit { background: transparent; color: #f0fff8; border: none;
+QPushButton#orbExpand, QPushButton#orbQuit { background: transparent; color: #f7f8ff; border: none;
 border-radius: 18px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
-QPushButton#orbExpand:hover, QPushButton#orbQuit:hover { background: #285647; }
-QPushButton#orbExpand:checked { background: #2f7965; }
+QPushButton#orbExpand:hover, QPushButton#orbQuit:hover { background: #3d4c78; }
+QPushButton#orbExpand:checked { background: #4f46c8; }
 QPushButton#orbQuit { padding: 0; font-size: 18px; }
 QCheckBox { padding: 2px; }
 """
@@ -1007,7 +1044,7 @@ def run(background=False):
     icon = QPixmap(64, 64)
     icon.fill(Qt.GlobalColor.transparent)
     painter = QPainter(icon)
-    painter.fillRect(icon.rect(), QColor("#196d5d"))
+    painter.fillRect(icon.rect(), QColor("#4f46c8"))
     painter.setPen(Qt.GlobalColor.white)
     font = painter.font()
     font.setPixelSize(26)

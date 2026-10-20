@@ -1,7 +1,7 @@
 {
   "name": "twintext",
-  "version": "0.6.0",
-  "description": "Offline and optional Azure Chat/Desktop translation for Codex on Windows and Linux.",
+  "version": "0.7.0",
+  "description": "Offline, Azure and experimental Google Free Chat/Desktop translation for Codex on Windows and Linux.",
   "author": {
     "name": "LincolnGothic"
   },
@@ -20,7 +20,7 @@
   "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "TwinText",
-    "shortDescription": "Offline or Azure translation in chat or a floating window",
+    "shortDescription": "Offline, Azure or Google Free translation in chat or a floating window",
     "longDescription": "Choose in-chat or floating-window translations, bilingual or translated-only, with independent translation and interface languages.",
     "developerName": "LincolnGothic",
     "category": "Productivity",
@@ -32,7 +32,7 @@
     "websiteURL": "https://github.com/LincolnGothic/twintext-codex",
     "composerIcon": "./assets/icon.svg",
     "logo": "./assets/icon.svg",
-    "brandColor": "#196D5D",
+    "brandColor": "#4F46C8",
     "defaultPrompt": [
       "Open TwinText settings",
       "Translate this reply with TwinText"

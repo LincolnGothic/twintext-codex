@@ -36,7 +36,7 @@ for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_p
       if (call.name === "twintext_set_settings") Object.assign(status.settings, call.arguments);
       return {ok:true, json:async () => status};
     },
-    setTimeout, clearTimeout,
+    setTimeout, clearTimeout, AbortController,
   });
   await settle();
   assert.equal(element("response-scope").value, saved.response_scope || "final");

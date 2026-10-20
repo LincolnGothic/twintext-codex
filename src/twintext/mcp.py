@@ -1,7 +1,9 @@
 """Local newline-delimited JSON-RPC MCP server (stdio transport)."""
 
 import json
+import queue
 import sys
+import threading
 
 from twintext import __version__
 from twintext.cache import Cache
@@ -11,6 +13,7 @@ from twintext.config import (
     MODES,
     PROVIDERS,
     RESPONSE_SCOPES,
+    TRANSLATION_LANGUAGES,
     WORKFLOWS,
     TwinTextError,
     update_settings,
@@ -19,7 +22,7 @@ from twintext.engine import STARTER_PAIRS
 from twintext.service import Service
 
 UI_URI = "ui://twintext/settings.html"
-LANGUAGE_SCHEMA = {"type": "string", "enum": list(LANGUAGES)}
+LANGUAGE_SCHEMA = {"type": "string", "enum": list(TRANSLATION_LANGUAGES)}
 
 
 def tools():
@@ -48,12 +51,13 @@ def tools():
     return [
         tool(
             "twintext_translate",
-            "Translate Markdown using the selected provider (Offline or Azure). "
+            "Translate Markdown using the selected provider (Offline, Azure or Google Free). "
             "Azure sends source text to Microsoft using locally configured credentials. "
+            "Google Free sends source text to Google using an experimental keyless interface. "
             "Return bilingual, translated-only, or original display without changing code.",
             {
                 "text": {"type": "string", "maxLength": 100000},
-                "source": {"type": "string", "enum": ["auto", *LANGUAGES]},
+                "source": {"type": "string", "enum": ["auto", *TRANSLATION_LANGUAGES]},
                 "target": LANGUAGE_SCHEMA,
                 "mode": {"type": "string", "enum": list(MODES)},
             },
@@ -76,7 +80,7 @@ def tools():
             "Save TwinText translation and display preferences.",
             {
                 "provider": {"type": "string", "enum": list(PROVIDERS)},
-                "source": {"type": "string", "enum": ["auto", *LANGUAGES]},
+                "source": {"type": "string", "enum": ["auto", *TRANSLATION_LANGUAGES]},
                 "workflow": {"type": "string", "enum": list(WORKFLOWS)},
                 "response_scope": {"type": "string", "enum": list(RESPONSE_SCOPES)},
                 "chat_presentation": {"type": "string", "enum": list(CHAT_PRESENTATIONS)},
@@ -118,7 +122,7 @@ def tools():
     ]
 
 
-def call_tool(name, arguments, service):
+def call_tool(name, arguments, service, cancel=None):
     definition = next((tool for tool in tools() if tool["name"] == name), None)
     if definition is None:
         raise TwinTextError(f"Unknown tool: {name}")
@@ -140,7 +144,8 @@ def call_tool(name, arguments, service):
         if "maxLength" in field and len(value) > field["maxLength"]:
             raise TwinTextError(f"{key} exceeds {field['maxLength']} characters.")
     if name == "twintext_translate":
-        return service.translate(**arguments)
+        return (service.translate(**arguments, cancel=cancel) if cancel is not None
+                else service.translate(**arguments))
     if name == "twintext_send_to_reader":
         from twintext.bridge import send_to_reader
 
@@ -162,7 +167,7 @@ def call_tool(name, arguments, service):
     return service.status()
 
 
-def handle(request, service):
+def handle(request, service, cancel=None):
     if not isinstance(request, dict) or request.get("jsonrpc") != "2.0":
         return {
             "jsonrpc": "2.0",
@@ -219,7 +224,8 @@ def handle(request, service):
             }
         elif method == "tools/call":
             try:
-                value = call_tool(params.get("name"), params.get("arguments", {}), service)
+                value = call_tool(params.get("name"), params.get("arguments", {}), service,
+                                  cancel=cancel)
                 text = value.get("display", json.dumps(value, ensure_ascii=False))
                 result = {
                     "content": [{"type": "text", "text": text}],
@@ -239,26 +245,62 @@ def handle(request, service):
 
 def serve():
     service = Service()
-    while True:
-        line = sys.stdin.buffer.readline(1_100_000)
-        if not line:
-            break
+    incoming = queue.Queue()
+    cancelled = {}
+    registry_lock = threading.Lock()
+    invalid = object()
+
+    def read():
+        # Keep stdin responsive to cancellations while the main worker translates.
         try:
-            if len(line) > 1_000_000:
-                # Drain the remainder of this oversized frame, then continue.
-                while not line.endswith(b"\n"):
-                    line = sys.stdin.buffer.readline(1_100_000)
-                    if not line:
-                        break
-                raise ValueError("Frame exceeds 1 MB")
-            request = json.loads(line)
-            response = handle(request, service)
-        except (ValueError, UnicodeError):
-            response = {
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {"code": -32700, "message": "Invalid JSON"},
-            }
-        if response is not None:
-            sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+            while line := sys.stdin.buffer.readline(1_100_000):
+                event = None
+                try:
+                    if len(line) > 1_000_000:
+                        while line and not line.endswith(b"\n"):
+                            line = sys.stdin.buffer.readline(1_100_000)
+                        raise ValueError("Frame exceeds 1 MB")
+                    request = json.loads(line)
+                    if isinstance(request, dict):
+                        params = request.get("params", {})
+                        if (request.get("jsonrpc") == "2.0" and "id" not in request
+                                and request.get("method") == "notifications/cancelled"
+                                and isinstance(params, dict)):
+                            key = params.get("requestId")
+                            if type(key) in (str, int):
+                                with registry_lock:
+                                    if key in cancelled:
+                                        cancelled[key].set()
+                            continue
+                        if (request.get("method") == "tools/call"
+                                and isinstance(params, dict)
+                                and params.get("name") == "twintext_translate"
+                                and type(request.get("id")) in (str, int)):
+                            event = threading.Event()
+                            with registry_lock:
+                                cancelled[request["id"]] = event
+                except (ValueError, UnicodeError):
+                    request = invalid
+                incoming.put((request, event))
+        finally:
+            incoming.put(None)
+
+    threading.Thread(target=read, daemon=True).start()
+    try:
+        for request, event in iter(incoming.get, None):
+            if request is invalid:
+                response = {"jsonrpc": "2.0", "id": None,
+                            "error": {"code": -32700, "message": "Invalid JSON"}}
+            else:
+                response = handle(request, service, cancel=event)
+                if event is not None:
+                    with registry_lock:
+                        if cancelled.get(request["id"]) is event:
+                            cancelled.pop(request["id"])
+            if response is not None:
+                sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
+                sys.stdout.flush()
+    finally:
+        with registry_lock:
+            for event in cancelled.values():
+                event.set()
