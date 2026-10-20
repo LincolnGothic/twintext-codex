@@ -51,16 +51,113 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.window.reader.toPlainText(), "Original answer")
         self.assertIn("Google Free", self.window.status.text())
 
-    def test_native_preferences_can_choose_floating_before_switching_to_chat(self):
-        presentation = self.window.selects["chat_presentation"]
-        self.assertTrue(presentation.isEnabled())
-        presentation.setCurrentIndex(presentation.findData("floating"))
+    def test_display_location_selects_floating_chat_in_one_step(self):
         with patch.object(self.app, "quit") as quit_app:
-            workflow = self.window.selects["workflow"]
-            workflow.setCurrentIndex(workflow.findData("chat"))
+            location = self.window.selects["location"]
+            location.setCurrentIndex(location.findData("chat-floating"))
             quit_app.assert_not_called()
         self.assertTrue(load_settings().floating_chat)
         self.assertTrue(self.window.orb.isVisible())
+
+    def test_settings_occupy_body_and_back_restores_paste_editor(self):
+        self.window.show()
+        self.window.paste()
+        self.window.settings_button.click()
+        self.app.processEvents()
+        self.assertTrue(self.window.preference_scroll.isVisible())
+        for widget in (self.window.reader, self.window.editor, self.window.sessions,
+                       self.window.paste_button, self.window.translate_button,
+                       self.window.copy_button, self.window.toggle_button,
+                       self.window.clear_button):
+            self.assertFalse(widget.isVisible())
+        self.assertGreater(self.window.preference_scroll.height(), 360)
+        self.window.settings_button.click()
+        self.assertTrue(self.window.reader.isVisible())
+        self.assertTrue(self.window.editor.isVisible())
+        self.assertTrue(self.window.translate_button.isVisible())
+
+    def test_inline_choice_keeps_settings_open_until_back(self):
+        self.window.show()
+        self.window.settings_button.click()
+        with patch.object(self.app, "quit") as quit_app:
+            combo = self.window.selects["location"]
+            combo.setCurrentIndex(combo.findData("chat-inline"))
+            self.assertTrue(self.window.preference_scroll.isVisible())
+            self.assertFalse(self.window.orb.isVisible())
+            quit_app.assert_not_called()
+            self.window.selects["response_scope"].setCurrentIndex(1)
+            self.window.settings_button.click()
+            quit_app.assert_called_once_with()
+        self.assertEqual(load_settings().response_scope, "all")
+
+    def test_reader_toggle_reuses_translation_without_changing_preferences(self):
+        self.window.settings = update_settings(workflow="chat", chat_presentation="floating")
+        self.window.localize()
+        text = "Original English.\n\n```sh\nnpm test\n```\n"
+        self.inbox.publish(payload(text=text), archive=True)
+        self.window.poll()
+        self.deliver_result()
+        saved = load_settings()
+        jobs = len(self.worker.jobs)
+        self.window.toggle_button.click()
+        self.assertNotIn("译:", self.window.reader.toPlainText())
+        self.window.toggle_button.click()
+        self.assertIn("译:Original English", self.window.reader.toPlainText())
+        self.assertEqual(len(self.worker.jobs), jobs)
+        self.assertEqual(load_settings(), saved)
+        self.window.copy()
+        self.assertEqual(self.app.clipboard().text(), text)
+
+    def test_reader_toggle_cancels_pending_result_and_can_translate_again(self):
+        self.inbox.publish(payload(text="Hello"))
+        self.window.poll()
+        revision = self.worker.jobs[-1][0]
+        with patch.object(self.window, "cancel_translation") as cancel:
+            self.window.toggle_button.click()
+            cancel.assert_called_once_with()
+        self.worker.results.put((revision, self.service.translate("Hello"), None))
+        self.window.poll()
+        self.assertEqual(self.window.reader.toPlainText(), "Hello")
+        self.window.toggle_button.click()
+        self.deliver_result()
+        self.assertIn("译:Hello", self.window.reader.toPlainText())
+
+    def test_reader_toggle_from_original_mode_and_after_failure(self):
+        self.window.settings = update_settings(mode="original")
+        self.window.localize()
+        self.inbox.publish(payload(text="Hello"))
+        self.window.poll()
+        self.assertFalse(self.worker.jobs)
+        self.window.toggle_button.click()
+        revision = self.worker.jobs[-1][0]
+        self.worker.results.put((revision, None, "No model"))
+        self.window.poll()
+        self.assertEqual(self.window.reader.toPlainText(), "Hello")
+        self.assertEqual(self.window.toggle_button.text(), "Translate")
+        self.window.toggle_button.click()
+        self.deliver_result()
+        self.assertIn("译:Hello", self.window.reader.toPlainText())
+        self.assertEqual(load_settings().mode, "original")
+
+    def test_new_reply_restores_saved_display_mode_after_temporary_toggle(self):
+        for mode in ("bilingual", "translated", "original"):
+            with self.subTest(mode=mode):
+                self.window.clear()
+                self.worker.jobs.clear()
+                self.window.settings = update_settings(mode=mode)
+                self.inbox.publish(payload(text="First"))
+                self.window.poll()
+                self.window.toggle_button.click()
+                self.inbox.publish(payload(turn="next", text="Second"))
+                self.window.poll()
+                if mode == "original":
+                    self.assertEqual(self.window.reader.toPlainText(), "Second")
+                    self.assertEqual(len(self.worker.jobs), 1)
+                else:
+                    self.deliver_result()
+                    visible = self.window.reader.toPlainText()
+                    self.assertIn("译:Second", visible)
+                    self.assertEqual(visible.count("Second"), 2 if mode == "bilingual" else 1)
 
     def test_floating_chat_button_toggles_reader_and_copy_preserves_original(self):
         self.window.settings = update_settings(workflow="chat", chat_presentation="floating")
@@ -153,8 +250,8 @@ class DesktopTests(unittest.TestCase):
     def test_switch_to_chat_in_reader_preferences_quits(self):
         self.window.show()
         with patch.object(self.app, "quit") as quit_app:
-            combo = self.window.selects["workflow"]
-            combo.setCurrentIndex(combo.findData("chat"))
+            combo = self.window.selects["location"]
+            combo.setCurrentIndex(combo.findData("chat-inline"))
             quit_app.assert_called_once_with()
         self.assertEqual(load_settings().workflow, "chat")
         self.assertFalse(self.window.isVisible())
@@ -297,14 +394,15 @@ class DesktopTests(unittest.TestCase):
         self.assertTrue(questions.isChecked())
         self.assertFalse(scope.isEnabled())
         self.assertFalse(questions.isEnabled())
-        self.window.selects["workflow"].setCurrentIndex(1)
+        combo = self.window.selects["location"]
+        combo.setCurrentIndex(combo.findData("chat-floating"))
         self.assertTrue(scope.isEnabled())
         self.assertTrue(questions.isEnabled())
         scope.setCurrentIndex(scope.findData("all"))
         questions.setChecked(False)
         self.assertEqual(load_settings().response_scope, "all")
         self.assertFalse(load_settings().translate_questions)
-        self.window.selects["workflow"].setCurrentIndex(0)
+        combo.setCurrentIndex(combo.findData("desktop"))
         self.assertFalse(scope.isEnabled())
         self.assertEqual(load_settings().response_scope, "all")
         self.assertFalse(load_settings().translate_questions)
@@ -400,13 +498,15 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.window.settings_button.text(), "Paramètres")
 
     def test_translation_location_is_saved_without_changing_language_or_mode(self):
-        self.window.selects["workflow"].setCurrentIndex(1)
+        combo = self.window.selects["location"]
+        combo.setCurrentIndex(combo.findData("chat-floating"))
         settings = load_settings()
         self.assertEqual(settings.workflow, "chat")
         self.assertEqual(settings.target, "zh")
         self.assertEqual(settings.mode, "bilingual")
-        self.window.selects["workflow"].setCurrentIndex(0)
+        combo.setCurrentIndex(combo.findData("desktop"))
         self.assertEqual(load_settings().workflow, "desktop")
+        self.assertEqual(load_settings().chat_presentation, "floating")
 
     def test_settings_scroll_in_a_small_window_without_clipping_controls(self):
         self.window.show()

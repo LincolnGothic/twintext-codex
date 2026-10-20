@@ -14,7 +14,8 @@ class Element {
 }
 const script = readFileSync(new URL("../src/twintext/web/app.js", import.meta.url), "utf8");
 const settle = async () => {for (let i = 0; i < 20; ++i) await Promise.resolve();};
-for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_presentation:"floating"}]) {
+for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_presentation:"floating"},
+  {workflow:"desktop",chat_presentation:"floating"}]) {
   const elements = new Map();
   const element = id => {
     if (!elements.has(id)) elements.set(id, new Element());
@@ -40,31 +41,34 @@ for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_p
   });
   await settle();
   assert.equal(element("response-scope").value, saved.response_scope || "final");
-  assert.equal(element("chat-presentation").value, saved.chat_presentation || "inline");
+  assert.equal(element("location").value, saved.workflow === "desktop" ? "desktop" : saved.chat_presentation === "floating" ? "chat-floating" : "chat-inline");
   assert.equal(element("translate-questions").checked, saved.translate_questions ?? true);
-  assert.equal(element("response-scope").disabled, false);
-  element("workflow").value = "desktop";
-  element("workflow").listeners.change();
+  assert.equal(element("response-scope").disabled, saved.workflow === "desktop");
+  element("location").value = "desktop";
+  element("location").listeners.change();
   assert.equal(element("response-scope").disabled, true);
-  assert.equal(element("chat-presentation").disabled, true);
   assert.equal(element("translate-questions").disabled, true);
-  element("workflow").value = "chat";
-  element("workflow").listeners.change();
+  await element("settings-form").listeners.submit({preventDefault() {}});
+  assert.equal(status.settings.workflow, "desktop");
+  assert.equal(status.settings.chat_presentation, saved.chat_presentation || "inline");
+  element("location").value = "chat-floating";
+  element("location").listeners.change();
   assert.equal(element("response-scope").disabled, false);
   element("response-scope").value = "all";
-  element("chat-presentation").value = "floating";
   element("translate-questions").checked = false;
   for (const language of ["en", "zh", "ja", "fr", "es"]) {
     element("ui-language").value = language;
     element("ui-language").listeners.change();
     assert.equal(element("response-scope").value, "all", "Localization must preserve selection");
     assert.equal(element("response-scope").options.length, 2);
-    assert.equal(element("chat-presentation").value, "floating");
-    assert.equal(element("chat-presentation").options.length, 2);
+    assert.equal(element("location").value, "chat-floating");
+    assert.equal(element("location").options.length, 3);
+    assert.ok(element("location").options.every(option => option.text && option.text !== option.value));
     assert.ok(element("response-scope").options.every(option => option.text && option.text !== option.value));
   }
   await element("settings-form").listeners.submit({preventDefault() {}});
-  const settingsCall = calls.find(call => call.name === "twintext_set_settings");
+  const settingsCall = calls.filter(call => call.name === "twintext_set_settings").at(-1);
+  assert.equal(settingsCall.arguments.workflow, "chat");
   assert.equal(settingsCall.arguments.response_scope, "all");
   assert.equal(settingsCall.arguments.chat_presentation, "floating");
   assert.equal(settingsCall.arguments.translate_questions, false);

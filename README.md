@@ -10,7 +10,7 @@ host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 Google Free (experimental) is an optional keyless online provider. Offline remains the default.
 
-[Download 0.7.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.7.0) ·
+[Download 0.7.1](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.7.1) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
@@ -22,11 +22,14 @@ Google Free (experimental) is an optional keyless online provider. Offline remai
 | **Desktop** | Completed replies in a separate floating window, with a compact draggable button | Automatic translation makes no additional LLM requests and returns no translations to model context |
 
 Chat preserves the original **0.1** experience; Desktop preserves the **0.2.2**
-experience. Version **0.7.0** maintains both through a shared translation engine,
+experience. Version **0.7.1** maintains both through a shared translation engine,
 Markdown parser, language packs and settings. The old releases are historical
 versions; new fixes apply to both styles in the current version.
 
-Select **Translation location** in TwinText settings. Start a **new Codex chat**
+Select **Display location** in TwinText settings: **In Codex conversation**,
+**Floating reader beside Codex**, or **Desktop reader (completed replies)**.
+This single control replaces the separate location and Chat presentation selectors;
+existing saved preferences are preserved. Start a **new Codex chat**
 after switching styles so instructions from the previous style do not persist.
 Desktop is the default for a repository install. A release ZIP chooses its named
 style only on a first installation; upgrades preserve the existing choice.
@@ -47,7 +50,7 @@ After [finishing setup](#finish-setup-and-try-a-translation):
 
 1. Open TwinText settings in the Codex plugin panel, or use `twintext ui --open`
    with the [Windows CLI launcher](#windows) on Windows.
-2. Set **Translation location → Codex chat**, **Translate into → Chinese**
+2. Set **Display location → In Codex conversation**, **Translate into → Chinese**
    (or your preferred language), and **Display mode → Bilingual**.
 3. Choose **Final answers only** or **All responses (including progress updates)**.
    Set **Translate questions in chat** separately; it is enabled by default.
@@ -73,18 +76,18 @@ or `twintext settings --response-scope all --translate-questions false`.
 
 ![TwinText web settings with Codex chat selected, Final answers only, Translate questions in chat enabled, Chinese target and Bilingual display](docs/chat-settings.jpg)
 
-*Screenshot of TwinText 0.5.1's web settings in an isolated preview. The same
-controls are available in the embedded Codex plugin panel. The preview has no
+*Screenshot of TwinText 0.5.1's web settings in an isolated preview. Current versions
+combine location and presentation into Display location. The preview has no
 language packs installed; install models before using Offline translation.*
 
 </details>
 
 #### Floating Chat presentation: copy only the original
 
-Prefer a small translation button beside Codex? Choose **Chat presentation →
-Floating button and reader** and **Display mode → Bilingual**. Enable **Open
+Prefer a small translation button beside Codex? Choose **Display location →
+Floating reader beside Codex** and **Display mode → Bilingual**. Enable **Open
 floating button on new replies** in native settings, or open the reader manually.
-Keep **Translation location → Codex chat**; start a new chat after switching presentation.
+Start a new chat after switching display location.
 
 - Drag the small **T** button beside the conversation. Click once to show the
   bilingual reader beside it; click again to hide it and leave the original
@@ -93,6 +96,15 @@ Keep **Translation location → Codex chat**; start a new chat after switching p
 - New answers stay in their original language inside Codex. Its Copy button
   therefore excludes translations. The reader's **Copy original** copies the
   exact original Markdown, even while bilingual text is visible.
+- In the reader, **Original** hides the translation and cancels pending work;
+  **Translate** shows it again. Completed translations are reused without another
+  translation request. This temporary switch does not change saved preferences;
+  new replies use the saved display mode. With **Display mode → Original**, a
+  manual Translate click shows a bilingual view for that reply.
+- **Settings** replaces the reader and paste area with preferences. **Back to
+  reader** restores them. Smaller windows can scroll the preferences. Choosing
+  **In Codex conversation** keeps settings open until Back, then closes the reader.
+
 - Final answers arrive through Stop when question translation is enabled. With
   questions disabled, Codex forwards only informational final passages through
   the delivery tool, excluding questions even in mixed replies. With **All responses**, selected progress
@@ -103,6 +115,10 @@ Keep **Translation location → Codex chat**; start a new chat after switching p
   selectable after restarting the reader or clearing the translation cache.
   History has no automatic expiry; **Clear received replies** removes it.
   Previous chat messages remain unchanged and are not automatically imported.
+
+![Native settings with one display-location selector and no reading or paste area](docs/display-settings.png)
+
+*Native Chinese-interface preview of 0.7.1 using isolated settings.*
 
 ![Floating Chat reader with a bilingual English–Chinese reply, a saved-reply selector and Copy original](docs/floating-chat.png)
 
@@ -116,7 +132,8 @@ Use `--chat-presentation inline` to return to translations in the conversation.
 
 Read completed replies in a **separate floating window**. Collapse it to the
 compact draggable TwinText button, or use **×** to quit the reader. Switching to
-Codex Chat closes a running reader; opening it manually for settings remains available.
+**In Codex conversation** closes a running reader after leaving native settings;
+opening it manually for settings remains available.
 
 ![TwinText displaying an English–Chinese bilingual table](docs/tables.png)
 
@@ -131,8 +148,8 @@ Choose your operating system and preferred first-install style:
 
 | Operating system | Chat default | Floating-window default | Checksums |
 | --- | --- | --- | --- |
-| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/TwinText-0.7.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/TwinText-0.7.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/SHA256SUMS-linux.txt) |
-| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/TwinText-0.7.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/TwinText-0.7.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/SHA256SUMS-windows.txt) |
+| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/TwinText-0.7.1-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/TwinText-0.7.1-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/SHA256SUMS-linux.txt) |
+| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/TwinText-0.7.1-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/TwinText-0.7.1-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/SHA256SUMS-windows.txt) |
 
 Each ZIP supports **both** styles. Install one package, then switch in settings.
 Check its SHA-256 hash against the matching checksum file before installation.
@@ -412,14 +429,14 @@ On Windows, use `.venv\Scripts\python.exe` and `.venv\Scripts\ruff.exe`; set
 `$env:QT_QPA_PLATFORM = 'offscreen'` before the Qt tests. The development install
 above omits the optional engine; add the `engine` extra for real-model work.
 
-Version 0.7.0 includes **140 regression tests** for Windows and Linux with Python
+Version 0.7.1 includes **140 regression tests** for Windows and Linux with Python
 3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
 native hooks, real Offline English→Chinese tables, Qt rendering and preservation
-of settings/models on upgrade. [Release notes](docs/release-0.7.0.md).
+of settings/models on upgrade. [Release notes](docs/release-0.7.1.md).
 Interactive Codex sessions, hook trust and compositor behavior still require host testing.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.7.0.md). Report bugs with your OS, Python/Codex/
+and [release notes](docs/release-0.7.1.md). Report bugs with your OS, Python/Codex/
 TwinText versions, style, language pair and a sanitized Markdown example; avoid
 posting private conversations or local databases.
 
