@@ -93,6 +93,7 @@ def tools():
                 "host_locale": {"type": "string", "enum": ["auto", *LANGUAGES]},
                 "desktop_auto_start": {"type": "boolean"},
                 "always_on_top": {"type": "boolean"},
+                "follow_codex": {"type": "boolean"},
             },
             read_only=False,
         ),

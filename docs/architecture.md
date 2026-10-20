@@ -103,7 +103,17 @@ macOS and Claude Code integration are not shipped in 0.3.0.
 The Stop payload provides completed text when available, not partial streams,
 Codex's UI locale or native menu text. An embedded settings panel can record the
 host locale; Desktop otherwise falls back to the system locale. No accessibility
-capture, OCR, screen scraping or Codex-window tracking is implemented.
+capture, OCR or screen scraping is implemented. Optional window tracking reads
+application identity, focus and bounds only; it never reads text or modifies the
+Codex process. Windows uses typed Win32 APIs; Linux uses EWMH through python-xlib.
+The Qt follower converts monitor coordinates, retains drag offsets for the run,
+and hides its windows when Codex is minimized or inactive. Linux attachment uses
+XCB so Qt can position its own windows under XWayland. Native Wayland Codex windows
+are outside this backend's scope. Missing backends or lost display connections
+leave the manual button usable. A detected window does not identify the active
+chat; the inbox selector remains the source of reply selection. Attached Desktop
+defers inference until the reader opens, then reuses completed results for both
+display modes and subsequent show/hide operations.
 
 Desktop's bridge has no network listener. The optional web settings server binds
 only to loopback and checks its session token, Origin and Host. Offline inference uses

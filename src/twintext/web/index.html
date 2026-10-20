@@ -20,6 +20,8 @@
           <label for="provider" data-i18n="provider">Translation provider</label><select id="provider" name="provider"><option value="offline">Offline — Argos</option><option value="azure">Microsoft Azure Translator</option><option value="google-free">Google Free (experimental)</option></select>
           <p id="provider-hint" class="hint" hidden>Save your provider selection before translating.</p>
           <label for="location" data-i18n="location">Display location</label><select id="location" name="location"></select>
+          <label class="check"><input type="checkbox" id="follow-codex"><span data-i18n="followCodex">Follow Codex window</span></label>
+          <p class="hint" data-i18n="followCodexHint">Windows and X11/XWayland. The floating button follows Codex; click to show or hide translation. Native Wayland uses manual placement.</p>
           <label for="response-scope" data-i18n="responseScope">Chat response scope</label><select id="response-scope" name="response_scope"></select>
           <label class="check"><input type="checkbox" id="translate-questions" checked><span data-i18n="translateQuestions">Translate questions in chat</span></label>
           <p class="hint" data-i18n="chatHint">Chat only. Questions follow their own setting, including question cards and answer choices.</p>
@@ -68,7 +70,7 @@
         <button id="clear-cache" class="text-button" type="button" data-i18n="clearCache">Clear remembered translations</button>
       </div>
     </div>
-    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.7.1 · MIT</span></footer>
+    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.8.0 · MIT</span></footer>
   </main>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <script nonce="{{TOKEN}}">window.TWINTEXT_BOOT = {token: "{{TOKEN}}", embedded: {{EMBEDDED}}};

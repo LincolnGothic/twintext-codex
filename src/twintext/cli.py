@@ -52,6 +52,7 @@ def parser():
     settings.add_argument("--cache", choices=["true", "false"])
     settings.add_argument("--desktop-auto-start", choices=["true", "false"])
     settings.add_argument("--always-on-top", choices=["true", "false"])
+    settings.add_argument("--follow-codex", choices=["true", "false"])
     commands.add_parser("status", help="Inspect settings and installed models")
     commands.add_parser(
         "azure-configure", help="Save your Azure credentials via a masked local prompt"
@@ -150,11 +151,12 @@ def main(argv=None):
                     "cache",
                     "desktop_auto_start",
                     "always_on_top",
+                    "follow_codex",
                 )
                 if getattr(args, key) is not None
             }
             for key in ("enabled", "cache", "desktop_auto_start", "always_on_top",
-                        "translate_questions"):
+                        "translate_questions", "follow_codex"):
                 if key in changes:
                     changes[key] = changes[key] == "true"
             value = update_settings(**changes) if changes else load_settings()

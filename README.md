@@ -10,7 +10,7 @@ host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 Google Free (experimental) is an optional keyless online provider. Offline remains the default.
 
-[Download 0.7.1](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.7.1) ·
+[Download 0.8.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.8.0) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
@@ -22,7 +22,7 @@ Google Free (experimental) is an optional keyless online provider. Offline remai
 | **Desktop** | Completed replies in a separate floating window, with a compact draggable button | Automatic translation makes no additional LLM requests and returns no translations to model context |
 
 Chat preserves the original **0.1** experience; Desktop preserves the **0.2.2**
-experience. Version **0.7.1** maintains both through a shared translation engine,
+experience. Version **0.8.0** maintains both through a shared translation engine,
 Markdown parser, language packs and settings. The old releases are historical
 versions; new fixes apply to both styles in the current version.
 
@@ -82,6 +82,48 @@ language packs installed; install models before using Offline translation.*
 
 </details>
 
+#### A button that follows Codex (0.8.0)
+
+To show translations only when you press a button:
+
+1. In TwinText Settings, choose **Desktop reader (completed replies)**, enable
+   **Follow Codex window**, and set your translation language.
+2. Choose **Bilingual** or **Translation only** for the reader.
+3. Enable **Open floating button on new replies** and start a new Codex chat with
+   the TwinText plugin enabled and its Stop hook trusted.
+4. Click **T** once to show the reader; click again to hide it. Codex's original
+   answer stays visible in its conversation. Completed translations are reused.
+
+The compact button sits inside the upper-right edge of Codex's window. Drag it
+to choose a different position for this run. The button and open reader follow
+window movement and resizing, hide when Codex is minimized or another app is
+active, and return when Codex is active again. With several Codex windows, they
+follow the most recently focused one. The reply selector still contains captured
+replies across chats; following a window does not identify its selected chat.
+
+Attachment supports **Windows** and **Linux X11/XWayland**. Linux automatically
+uses Qt's XCB backend when attachment is enabled at startup and DISPLAY is
+available; restart TwinText after enabling this setting in a Wayland session.
+Native Wayland Codex windows cannot be tracked through this interface. If no
+compatible Codex window is found, the button remains manually movable. Following
+is off by default for existing installations and can be enabled in native/web
+settings or with `twintext settings --follow-codex true`.
+
+This is a separate companion overlay. TwinText does not insert a native icon
+beside Codex's Copy button or rewrite messages already displayed by Codex. The
+[documented plugin UI](https://developers.openai.com/plugins/build/chatgpt-ui)
+runs in a separate component; it does not document a native message-toolbar slot.
+
+![TwinText 0.8.0 showing a real offline bilingual translation](docs/window-follow.png)
+
+*Live Linux reader preview with sample text, attached to a detected Codex window.
+The reader uses the same selected mode when reopened.*
+
+CLI: `twintext settings --workflow desktop --follow-codex true --target zh --mode bilingual`.
+Then run `twintext desktop --background`. Use `--mode translated` for translation
+only. Desktop capture adds no translation text to Codex context. New replies
+received while the attached reader is collapsed are translated on first open.
+
 #### Floating Chat presentation: copy only the original
 
 Prefer a small translation button beside Codex? Choose **Display location →
@@ -91,8 +133,8 @@ Start a new chat after switching display location.
 
 - Drag the small **T** button beside the conversation. Click once to show the
   bilingual reader beside it; click again to hide it and leave the original
-  Codex conversation visible. **×** quits both windows. The button does not
-  automatically attach to or track the Codex window.
+  Codex conversation visible. **×** quits both windows. The button can
+  track Codex when **Follow Codex window** is enabled in settings.
 - New answers stay in their original language inside Codex. Its Copy button
   therefore excludes translations. The reader's **Copy original** copies the
   exact original Markdown, even while bilingual text is visible.
@@ -148,8 +190,8 @@ Choose your operating system and preferred first-install style:
 
 | Operating system | Chat default | Floating-window default | Checksums |
 | --- | --- | --- | --- |
-| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/TwinText-0.7.1-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/TwinText-0.7.1-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/SHA256SUMS-linux.txt) |
-| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/TwinText-0.7.1-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/TwinText-0.7.1-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.1/SHA256SUMS-windows.txt) |
+| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.8.0/TwinText-0.8.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.8.0/TwinText-0.8.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.8.0/SHA256SUMS-linux.txt) |
+| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.8.0/TwinText-0.8.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.8.0/TwinText-0.8.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.8.0/SHA256SUMS-windows.txt) |
 
 Each ZIP supports **both** styles. Install one package, then switch in settings.
 Check its SHA-256 hash against the matching checksum file before installation.
@@ -282,7 +324,8 @@ table. See [format coverage and limits](docs/output-formats.md).
 
 Window placement/pinning depends on the desktop. On GNOME/Wayland, hints may be
 ignored; where XWayland is available, try `QT_QPA_PLATFORM=xcb twintext desktop`.
-The floating reader does not track or overlay the Codex window automatically.
+Enable **Follow Codex window** for attachment on Windows or X11/XWayland.
+Native Wayland windows require manual placement.
 
 ## Costs and privacy
 
@@ -429,14 +472,15 @@ On Windows, use `.venv\Scripts\python.exe` and `.venv\Scripts\ruff.exe`; set
 `$env:QT_QPA_PLATFORM = 'offscreen'` before the Qt tests. The development install
 above omits the optional engine; add the `engine` extra for real-model work.
 
-Version 0.7.1 includes **140 regression tests** for Windows and Linux with Python
-3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
+Version 0.8.0 adds regression coverage for attachment, focus/minimize/restore,
+on-demand translation, drag offsets and settings. The CI matrix covers Windows
+and Linux with Python 3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
 native hooks, real Offline English→Chinese tables, Qt rendering and preservation
-of settings/models on upgrade. [Release notes](docs/release-0.7.1.md).
+of settings/models on upgrade. [Release notes](docs/release-0.8.0.md).
 Interactive Codex sessions, hook trust and compositor behavior still require host testing.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.7.1.md). Report bugs with your OS, Python/Codex/
+and [release notes](docs/release-0.8.0.md). Report bugs with your OS, Python/Codex/
 TwinText versions, style, language pair and a sanitized Markdown example; avoid
 posting private conversations or local databases.
 

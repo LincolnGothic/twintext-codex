@@ -62,6 +62,7 @@ class Settings:
     host_locale: str = "auto"
     desktop_auto_start: bool = True
     always_on_top: bool = True
+    follow_codex: bool = False
     workflow: str = "desktop"
     response_scope: str = "final"
     translate_questions: bool = True
@@ -97,10 +98,10 @@ class Settings:
         if any(
             type(value) is not bool
             for value in (self.enabled, self.cache, self.desktop_auto_start, self.always_on_top,
-                          self.translate_questions)
+                          self.translate_questions, self.follow_codex)
         ):
             raise TwinTextError(
-                "Enabled, cache, auto-start, always-on-top and questions must be booleans."
+                "Enabled, cache, auto-start, always-on-top, follow and questions must be booleans."
             )
         return self
 

@@ -14,7 +14,7 @@ class Element {
 }
 const script = readFileSync(new URL("../src/twintext/web/app.js", import.meta.url), "utf8");
 const settle = async () => {for (let i = 0; i < 20; ++i) await Promise.resolve();};
-for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_presentation:"floating"},
+for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_presentation:"floating",follow_codex:true},
   {workflow:"desktop",chat_presentation:"floating"}]) {
   const elements = new Map();
   const element = id => {
@@ -43,6 +43,8 @@ for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_p
   assert.equal(element("response-scope").value, saved.response_scope || "final");
   assert.equal(element("location").value, saved.workflow === "desktop" ? "desktop" : saved.chat_presentation === "floating" ? "chat-floating" : "chat-inline");
   assert.equal(element("translate-questions").checked, saved.translate_questions ?? true);
+  assert.equal(element("follow-codex").checked, saved.follow_codex ?? false);
+  assert.equal(element("follow-codex").disabled, !saved.chat_presentation);
   assert.equal(element("response-scope").disabled, saved.workflow === "desktop");
   element("location").value = "desktop";
   element("location").listeners.change();
@@ -56,6 +58,7 @@ for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_p
   assert.equal(element("response-scope").disabled, false);
   element("response-scope").value = "all";
   element("translate-questions").checked = false;
+  element("follow-codex").checked = true;
   for (const language of ["en", "zh", "ja", "fr", "es"]) {
     element("ui-language").value = language;
     element("ui-language").listeners.change();
@@ -72,5 +75,6 @@ for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_p
   assert.equal(settingsCall.arguments.response_scope, "all");
   assert.equal(settingsCall.arguments.chat_presentation, "floating");
   assert.equal(settingsCall.arguments.translate_questions, false);
+  assert.equal(settingsCall.arguments.follow_codex, true);
 }
 console.log("Chat settings defaults, saved values, localization and workflow controls passed.");

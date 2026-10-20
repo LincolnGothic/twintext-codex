@@ -1,7 +1,9 @@
 """Qt floating reader. Translation and reply selection stay outside Codex context."""
 
+import os
 import queue
 import sqlite3
+import sys
 import threading
 from datetime import datetime
 
@@ -41,6 +43,7 @@ from twintext.config import (
 from twintext.credentials import load_credentials, save_credentials
 from twintext.service import Service
 from twintext.usage import CloudUsage, usage_label
+from twintext.window_follow import WindowFollower
 
 WORDS = {
     "en": {
@@ -364,6 +367,39 @@ for _language, _labels in {
     )))
 
 
+for _language, _labels in {
+    "en": ("Follow Codex window", "Following Codex", "Waiting for a Codex window (Windows / X11)",
+           "Window following unavailable; drag the button manually. Native Wayland is unsupported.",
+           "Show translation", "Hide translation", "Windows and X11/XWayland. Drag the button "
+           "to adjust its position. The button and reader follow Codex "
+           "and hide when it is inactive."),
+    "zh": ("跟随 Codex 窗口", "正在跟随 Codex", "等待 Codex 窗口（Windows / X11）",
+           "无法跟随窗口；请手动拖动按钮。不支持原生 Wayland 窗口。",
+           "显示翻译", "隐藏翻译", "支持 Windows 和 X11/XWayland。拖动按钮可调整位置。"
+           "按钮和阅读器跟随 Codex 移动，并在其非活动时隐藏。"),
+    "ja": ("Codex ウィンドウに追従", "Codex に追従中", "Codex ウィンドウを待機中（Windows / X11）",
+           "追従できません。ボタンを手動で移動してください。ネイティブ Wayland は非対応です。",
+           "翻訳を表示", "翻訳を隠す", "Windows と X11/XWayland に対応。ドラッグして位置を調整。"
+           "Codex に追従し、非アクティブ時は非表示になります。"),
+    "fr": ("Suivre la fenêtre Codex", "Suit Codex",
+           "En attente d’une fenêtre Codex (Windows / X11)",
+           "Suivi indisponible ; déplacez le bouton manuellement. "
+           "Wayland natif non pris en charge.",
+           "Afficher la traduction", "Masquer la traduction", "Windows et X11/XWayland. "
+           "Glissez le bouton pour le placer. Le lecteur suit Codex "
+           "et se masque s’il est inactif."),
+    "es": ("Seguir la ventana de Codex", "Siguiendo Codex",
+           "Esperando ventana de Codex (Windows / X11)",
+           "Seguimiento no disponible; arrastre el botón. Wayland nativo no es compatible.",
+           "Mostrar traducción", "Ocultar traducción", "Windows y X11/XWayland. Arrastre el botón "
+           "para colocarlo. El lector sigue a Codex y se oculta cuando está inactivo."),
+}.items():
+    WORDS[_language].update(dict(zip(
+        ("follow", "following", "follow_waiting", "follow_unavailable", "show_translation",
+         "hide_translation", "follow_hint"), _labels, strict=True,
+    )))
+
+
 def display_text(result, mode):
     if mode == "original":
         return result["original"]
@@ -482,6 +518,7 @@ class Companion(QWidget):
         self.translator = translator or Translator()
         self.settings = load_settings()
         self.quitting = False
+        self.reader_open = False
         self.revision = 0
         self.text = ""
         self.last_result = None
@@ -547,10 +584,14 @@ class Companion(QWidget):
         self.google_notice.setObjectName("muted")
         form.insertRow(1, self.google_notice)
         self.checks = {}
-        for key in ("enabled", "translate_questions", "cache", "start", "pin"):
+        for key in ("enabled", "translate_questions", "cache", "start", "pin", "follow"):
             box = QCheckBox()
             self.checks[key] = box
             form.addRow(box)
+        self.follow_hint = QLabel()
+        self.follow_hint.setWordWrap(True)
+        self.follow_hint.setObjectName("muted")
+        form.addRow(self.follow_hint)
         self.locale_hint = QLabel()
         self.locale_hint.setWordWrap(True)
         self.locale_hint.setObjectName("muted")
@@ -629,6 +670,7 @@ class Companion(QWidget):
         panel_layout.addWidget(self.orb_quit_button)
         orb_layout.addWidget(panel)
         self.orb.setFixedSize(196, 48)
+        self.follower = WindowFollower(self)
         self.setStyleSheet(STYLE)
         self.orb.setStyleSheet(STYLE)
         self.localize()
@@ -676,12 +718,14 @@ class Companion(QWidget):
         self.toggle_button.setText(self.t("original" if self.show_translation else "translate"))
         if self.settings.floating_chat:
             self.copy_button.setText(self.t("copy_original"))
-        self.orb_handle.setVisible(not self.settings.floating_chat)
-        self.orb_button.setCheckable(self.settings.floating_chat)
-        self.orb_button.setChecked(self.settings.floating_chat and self.isVisible())
-        self.orb_button.setMinimumSize(36 if self.settings.floating_chat else 116, 36)
-        self.orb_button.setText("T" if self.settings.floating_chat else "TwinText  ↗")
-        self.orb.setFixedSize(84 if self.settings.floating_chat else 196, 48)
+        self.orb_handle.setVisible(not self.button_toggles)
+        self.orb_button.setCheckable(self.button_toggles)
+        self.orb_button.setChecked(self.button_toggles and self.reader_open)
+        self.orb_button.setMinimumSize(36 if self.button_toggles else 116, 36)
+        self.orb_button.setText("T" if self.button_toggles else "TwinText  ↗")
+        self.orb.setFixedSize(84 if self.button_toggles else 196, 48)
+        self.follow_hint.setText(self.t("follow_hint"))
+        self.checks["follow"].setToolTip(self.t("follow_hint"))
         self.offline.setText(
             self.t("offline") if self.settings.provider == "offline"
             else self.t("google-free") if self.settings.provider == "google-free"
@@ -708,8 +752,7 @@ class Companion(QWidget):
         self.close_button.setAccessibleName(self.t("quit"))
         self.orb_handle.setToolTip(self.t("drag"))
         self.orb_handle.setAccessibleName(self.t("drag"))
-        self.orb_button.setToolTip(self.t("expand"))
-        self.orb_button.setAccessibleName(self.t("expand"))
+        self.update_orb_label()
         self.orb_quit_button.setToolTip(self.t("quit"))
         self.orb_quit_button.setAccessibleName(self.t("quit"))
         self.checks["cache"].setToolTip(self.t("cache_hint"))
@@ -740,7 +783,8 @@ class Companion(QWidget):
             combo.blockSignals(False)
             self.labels[key].setText(self.t(key))
         for key, box in self.checks.items():
-            field = {"start": "desktop_auto_start", "pin": "always_on_top"}.get(key, key)
+            field = {"start": "desktop_auto_start", "pin": "always_on_top",
+                     "follow": "follow_codex"}.get(key, key)
             box.blockSignals(True)
             box.setChecked(getattr(self.settings, field))
             box.setText(self.t(key))
@@ -748,6 +792,8 @@ class Companion(QWidget):
         for control in (self.selects["response_scope"], self.checks["translate_questions"]):
             control.setEnabled(self.settings.workflow == "chat")
             control.setToolTip(self.t("chat_hint"))
+        self.checks["follow"].setEnabled(
+            self.settings.workflow == "desktop" or self.settings.floating_chat)
         self.update_status()
         if not self.text:
             self.reader.setPlainText(self.t("empty"))
@@ -780,6 +826,7 @@ class Companion(QWidget):
                 cache=self.checks["cache"].isChecked(),
                 desktop_auto_start=self.checks["start"].isChecked(),
                 always_on_top=self.checks["pin"].isChecked(),
+                follow_codex=self.checks["follow"].isChecked(),
             )
             self.settings_changed(previous, keep_settings=not self.preference_scroll.isHidden())
         except (TwinTextError, OSError) as exc:
@@ -798,8 +845,12 @@ class Companion(QWidget):
             self.ids = ()
             if self.settings.floating_chat:
                 self.orb.show()
-        if previous.always_on_top != self.settings.always_on_top:
+        if (previous.always_on_top, previous.follow_codex) != (
+                self.settings.always_on_top, self.settings.follow_codex):
             self.apply_pin()
+            self.follower.failed = False
+            if self.settings.follow_codex:
+                self.orb.show()
         if (previous.source, previous.target, previous.cache, previous.provider) != (
             self.settings.source,
             self.settings.target,
@@ -854,14 +905,26 @@ class Companion(QWidget):
     def apply_pin(self):
         for window in (self, self.orb):
             visible = window.isVisible()
-            window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, self.settings.always_on_top)
+            window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint,
+                                 self.settings.always_on_top or self.settings.follow_codex)
             if visible:
                 window.show()
+
+    @property
+    def button_toggles(self):
+        return self.settings.floating_chat or self.settings.follow_codex
+
+    def update_orb_label(self):
+        label = ("hide_translation" if self.reader_open else "show_translation")
+        label = self.t(label if self.button_toggles else "expand")
+        self.orb_button.setToolTip(label)
+        self.orb_button.setAccessibleName(label)
 
     def expand(self):
         if self.quitting:
             return
-        if self.settings.floating_chat:
+        self.reader_open = True
+        if self.button_toggles:
             self.orb.show()
             area = self.orb.screen().availableGeometry()
             self.move(
@@ -874,12 +937,16 @@ class Companion(QWidget):
             self.orb.hide()
         self.show()
         self.raise_()
-        if not self.settings.floating_chat:
+        if self.settings.follow_codex and self.text and not self.last_result:
+            self.translate_current()
+        self.update_orb_label()
+        self.follower.tick()
+        if not self.button_toggles:
             self.activateWindow()
             self.orb_button.setText("TwinText  ↗")
 
     def orb_clicked(self):
-        if self.settings.floating_chat and self.isVisible():
+        if self.button_toggles and self.reader_open:
             self.collapse()
         else:
             self.expand()
@@ -891,8 +958,11 @@ class Companion(QWidget):
             self.quit()
             return
         self.hide()
+        self.reader_open = False
         self.orb.show()
         self.orb_button.setChecked(False)
+        self.update_orb_label()
+        self.follower.tick()
 
     def clear_cache(self):
         try:
@@ -906,6 +976,7 @@ class Companion(QWidget):
             return
         self.quitting = True
         self.timer.stop()
+        self.follower.close()
         self.cancel_translation()
         self.hide()
         self.orb.hide()
@@ -965,7 +1036,8 @@ class Companion(QWidget):
             self.status_key = "ready"
             self.update_status()
             return
-        if self.text and self.show_translation:
+        if (self.text and self.show_translation
+                and (not self.settings.follow_codex or self.reader_open)):
             self.status_key = "working"
             self.translator.submit(
                 self.revision, self.text, self.settings.source, self.settings.target
@@ -1036,6 +1108,9 @@ class Companion(QWidget):
             activation = self.inbox.activation()
             if activation != self.activation:
                 self.activation = activation
+                if (self.settings.follow_codex and self.follower.hidden
+                        and self.preference_scroll.isHidden()):
+                    self.toggle_settings()
                 self.expand()
             rows = self.inbox.history() if self.settings.floating_chat else self.inbox.replies()
             ids = tuple(row["id"] for row in rows)
@@ -1054,7 +1129,7 @@ class Companion(QWidget):
                     self.select_reply(0)
                     if self.orb.isVisible():
                         self.orb_button.setText(
-                            "T" if self.settings.floating_chat else "TwinText  ●"
+                            "T" if self.button_toggles else "TwinText  ●"
                         )
                 else:
                     self.text = ""
@@ -1079,6 +1154,10 @@ class Companion(QWidget):
                     self.render_result()
                     self.status_key = "ready"
                     self.update_status()
+            self.follower.tick()
+            if self.settings.follow_codex:
+                self.follow_hint.setText(
+                    self.t("follow_hint") + "\n" + self.t(self.follower.status))
         except (TwinTextError, OSError, sqlite3.Error) as exc:
             self.status.setText(str(exc))
 
@@ -1118,6 +1197,10 @@ def run(background=False):
         if not background:
             Inbox().activate()
         return 0
+    if (settings.follow_codex and sys.platform.startswith("linux") and os.environ.get("DISPLAY")
+            and not os.environ.get("QT_QPA_PLATFORM")):
+        # Wayland clients cannot position their own windows. Use XWayland when available.
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
     app = QApplication.instance() or QApplication([])
     app.setApplicationName("TwinText Desktop")
     app.setDesktopFileName("twintext")

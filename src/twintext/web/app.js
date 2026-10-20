@@ -51,6 +51,14 @@
     es:{location:"Lugar de visualización", "chat-inline":"En la conversación de Codex", "chat-floating":"Lector flotante junto a Codex", "desktop-reader":"Lector de escritorio (respuestas completas)"}
   };
   for (const [code, words] of Object.entries(locationWords)) Object.assign(translations[code], words);
+  const followWords = {
+    en:{followCodex:"Follow Codex window",followCodexHint:"Windows and X11/XWayland. The floating button follows Codex; click to show or hide translation. Native Wayland uses manual placement."},
+    zh:{followCodex:"跟随 Codex 窗口",followCodexHint:"支持 Windows 和 X11/XWayland。浮动按钮跟随 Codex，点击可显示或隐藏翻译。原生 Wayland 需手动放置。"},
+    ja:{followCodex:"Codex ウィンドウに追従",followCodexHint:"Windows と X11/XWayland に対応。ボタンをクリックして翻訳を表示・非表示。ネイティブ Wayland では手動で配置します。"},
+    fr:{followCodex:"Suivre la fenêtre Codex",followCodexHint:"Windows et X11/XWayland. Le bouton suit Codex ; cliquez pour afficher ou masquer la traduction. Placement manuel sous Wayland natif."},
+    es:{followCodex:"Seguir la ventana de Codex",followCodexHint:"Windows y X11/XWayland. El botón sigue a Codex; haga clic para mostrar u ocultar la traducción. Wayland nativo requiere colocación manual."}
+  };
+  for (const [code, words] of Object.entries(followWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
   let translationBusy = false, modelsBusy = false;
   let bridgeId = 0;
@@ -132,6 +140,7 @@
     const desktop = $("location").value === "desktop";
     $("response-scope").disabled = desktop;
     $("translate-questions").disabled = desktop;
+    $("follow-codex").disabled = $("location").value === "chat-inline";
   }
   function showModels(status) {
     const azure = $("provider").value === "azure";
@@ -185,7 +194,7 @@
     event.preventDefault(); $("save").disabled = true;
     try {
       const location = $("location").value;
-      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:location === "desktop" ? "desktop" : "chat",chat_presentation:location === "desktop" ? lastStatus.settings.chat_presentation || "inline" : location.slice(5),response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
+      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:location === "desktop" ? "desktop" : "chat",chat_presentation:location === "desktop" ? lastStatus.settings.chat_presentation || "inline" : location.slice(5),response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,follow_codex:$("follow-codex").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
       localize(); notify(t("saved"));
     } catch (error) { notify(error.message, true); } finally { $("save").disabled = false; }
   });
@@ -216,7 +225,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.7.1"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.8.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }
@@ -230,6 +239,7 @@
       $("location").value = settings.workflow === "chat" ? "chat-" + (settings.chat_presentation || "inline") : "desktop";
       $("response-scope").value = settings.response_scope || "final";
       $("translate-questions").checked = settings.translate_questions ?? true;
+      $("follow-codex").checked = settings.follow_codex ?? false;
       $("target").value = settings.target; $("source").value = settings.source; $("ui-language").value = settings.ui_language;
       document.querySelector(`input[name=mode][value=${settings.mode}]`).checked = true;
       $("enabled").checked = settings.enabled; $("cache").checked = settings.cache;
