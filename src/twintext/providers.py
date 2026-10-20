@@ -10,6 +10,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from twintext.config import TwinTextError
 from twintext.credentials import load_credentials
 from twintext.engine import ArgosEngine
+from twintext.google_free import GoogleFreeEngine
 from twintext.usage import CloudUsage
 
 AZURE_LANGUAGES = {"en": "en", "zh": "zh-Hans", "ja": "ja", "fr": "fr", "es": "es"}
@@ -160,7 +161,7 @@ def parse_azure_response(raw, target):
         raise TwinTextError("Azure returned an invalid response. Retry later.") from None
 
 
-PROVIDERS = {"offline": ArgosEngine, "azure": AzureEngine}
+PROVIDERS = {"offline": ArgosEngine, "azure": AzureEngine, "google-free": GoogleFreeEngine}
 
 
 def create_engine(provider):

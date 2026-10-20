@@ -13,6 +13,7 @@ from twintext.config import (
     MODES,
     PROVIDERS,
     RESPONSE_SCOPES,
+    TRANSLATION_LANGUAGES,
     WORKFLOWS,
     TwinTextError,
     load_settings,
@@ -28,8 +29,8 @@ def parser():
     commands = result.add_subparsers(dest="command", required=True)
     translate = commands.add_parser("translate", help="Translate a UTF-8 file or stdin")
     translate.add_argument("file", nargs="?", help="Input file; omit or use - for stdin")
-    translate.add_argument("--source", choices=["auto", *LANGUAGES])
-    translate.add_argument("--target", choices=list(LANGUAGES))
+    translate.add_argument("--source", choices=["auto", *TRANSLATION_LANGUAGES])
+    translate.add_argument("--target", choices=list(TRANSLATION_LANGUAGES))
     translate.add_argument("--mode", choices=MODES)
     translate.add_argument("--json", action="store_true")
     delivery = commands.add_parser("send-to-reader", help="Forward original text to floating Chat")
@@ -39,12 +40,12 @@ def parser():
     delivery.add_argument("--turn-id", default="")
     settings = commands.add_parser("settings", help="Read or save settings")
     settings.add_argument("--provider", choices=PROVIDERS)
-    settings.add_argument("--source", choices=["auto", *LANGUAGES])
+    settings.add_argument("--source", choices=["auto", *TRANSLATION_LANGUAGES])
     settings.add_argument("--workflow", choices=WORKFLOWS)
     settings.add_argument("--response-scope", choices=RESPONSE_SCOPES)
     settings.add_argument("--chat-presentation", choices=CHAT_PRESENTATIONS)
     settings.add_argument("--translate-questions", choices=["true", "false"])
-    settings.add_argument("--target", choices=list(LANGUAGES))
+    settings.add_argument("--target", choices=list(TRANSLATION_LANGUAGES))
     settings.add_argument("--mode", choices=MODES)
     settings.add_argument("--ui-language", choices=["auto", *LANGUAGES])
     settings.add_argument("--enabled", choices=["true", "false"])

@@ -35,18 +35,36 @@
     es: {chatPresentation:"Presentación del chat",inline:"En la conversación",floating:"Botón y lector flotantes"}
   };
   for (const [code, words] of Object.entries(presentationWords)) Object.assign(translations[code], words);
+  const providerWords = {
+    en: {provider:"Translation provider",googleFree:"Google Free (experimental)","zh-TW":"Chinese (Traditional)",googleNotice:"Uses a keyless interface not officially supported by Google Cloud. It may be rate limited, fail or change; availability, translation quality and free quota are not guaranteed. Text to translate is sent to Google."},
+    zh: {provider:"翻译引擎",googleFree:"Google 免费翻译（实验性）","zh-TW":"中文（繁体）",googleNotice:"使用非 Google Cloud 正式支持的免 Key 接口，可能限流、失效或变更；不保证可用性、翻译质量或免费额度。待翻译文本会发送至 Google。"},
+    ja: {provider:"翻訳エンジン",googleFree:"Google 無料翻訳（試験的）","zh-TW":"中国語（繁体字）",googleNotice:"Google Cloud が正式にサポートしないキー不要のインターフェースを使用します。制限、停止、変更の可能性があり、可用性、翻訳品質、無料枠は保証されません。翻訳するテキストは Google に送信されます。"},
+    fr: {provider:"Moteur de traduction",googleFree:"Google gratuit (expérimental)","zh-TW":"Chinois (traditionnel)",googleNotice:"Interface sans clé non officiellement prise en charge par Google Cloud : elle peut être limitée, indisponible ou modifiée. Disponibilité, qualité et quota gratuit non garantis. Le texte à traduire est envoyé à Google."},
+    es: {provider:"Motor de traducción",googleFree:"Google gratis (experimental)","zh-TW":"Chino (tradicional)",googleNotice:"Interfaz sin clave sin soporte oficial de Google Cloud. Puede limitarse, fallar o cambiar; no se garantizan disponibilidad, calidad ni cuota gratuita. El texto a traducir se envía a Google."}
+  };
+  for (const [code, words] of Object.entries(providerWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
   let translationBusy = false, modelsBusy = false;
   let bridgeId = 0;
   const pending = new Map();
+  const pageAbort = new AbortController();
+  const cancelRequest = id => window.parent.postMessage({jsonrpc:"2.0",method:"notifications/cancelled",params:{requestId:id}}, "*");
+  window.addEventListener("pagehide", () => {
+    pageAbort.abort();
+    if (boot.embedded) for (const [id, item] of pending) {
+      if (item.method === "tools/call") cancelRequest(id);
+      clearTimeout(item.timer); item.reject(new Error("Translation cancelled."));
+    }
+    pending.clear();
+  });
   const t = (key, values = {}) => Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, value), translations[locale][key] ?? translations.en[key] ?? key);
   const baseLocale = code => { const base = String(code || "en").toLowerCase().split(/[-_]/)[0]; return translations[base] ? base : "en"; };
   function notify(message, error = false) { $("notice").textContent = message; $("notice").classList.toggle("error", error); $("notice").hidden = false; }
   function request(method, params = {}, timeout = 60000) {
     const id = ++bridgeId;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { pending.delete(id); reject(new Error("Codex did not respond. Try the standalone settings page.")); }, timeout);
-      pending.set(id, {resolve, reject, timer});
+      const timer = setTimeout(() => { if (method === "tools/call") cancelRequest(id); pending.delete(id); reject(new Error("Codex did not respond. Try the standalone settings page.")); }, timeout);
+      pending.set(id, {resolve, reject, timer, method});
       window.parent.postMessage({jsonrpc:"2.0", id, method, params}, "*");
     });
   }
@@ -68,7 +86,7 @@
       if (result.isError) throw new Error(result.content?.map(item => item.text || "").join("\n") || "TwinText tool failed.");
       return result.structuredContent ?? JSON.parse(result.content[0].text);
     }
-    const response = await fetch("/api/tool", {method:"POST", headers:{"Content-Type":"application/json","X-TwinText-Token":boot.token}, body:JSON.stringify({name, arguments:args})});
+    const response = await fetch("/api/tool", {method:"POST", signal:pageAbort.signal, headers:{"Content-Type":"application/json","X-TwinText-Token":boot.token}, body:JSON.stringify({name, arguments:args})});
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "TwinText request failed.");
     return result;
@@ -76,7 +94,9 @@
   function selectOptions(element, automatic) {
     const previous = element.value;
     element.replaceChildren();
-    const entries = automatic ? [["auto", t(automatic)], ...Object.keys(translations).map(code => [code, t(code)])] : Object.keys(translations).map(code => [code, t(code)]);
+    const codes = Object.keys(translations);
+    if (element !== $("ui-language") && $("provider").value === "google-free") codes.push("zh-TW");
+    const entries = automatic ? [["auto", t(automatic)], ...codes.map(code => [code, t(code)])] : codes.map(code => [code, t(code)]);
     for (const [value, label] of entries) { const option = new Option(label, value); element.add(option); }
     if ([...element.options].some(option => option.value === previous)) element.value = previous;
   }
@@ -111,16 +131,19 @@
   }
   function showModels(status) {
     const azure = $("provider").value === "azure";
+    const google = $("provider").value === "google-free";
+    for (const option of $("provider").options) if (option.value === "google-free") option.textContent = t("googleFree");
     const unsaved = $("provider").value !== (status.provider || status.settings.provider || "offline");
     $("provider-hint").hidden = !unsaved;
     $("translate").disabled = unsaved || translationBusy;
     $("install").disabled = unsaved || modelsBusy;
-    $("offline-controls").hidden = azure;
+    $("offline-controls").hidden = azure || google;
     $("azure-controls").hidden = !azure;
+    $("google-controls").hidden = !google;
     $("azure-status").textContent = status.azure_configured ? "Credentials configured" : "Credentials not configured";
     $("cloud-usage").textContent = status.cloud_usage_label || "";
-    document.querySelector('[data-i18n="local"]').textContent = status.provider === "azure" ? "Microsoft Azure Translator" : t("local");
-    document.querySelector('[data-i18n="tagline"]').textContent = status.provider === "azure" ? "Azure translation for Codex" : t("tagline");
+    document.querySelector('[data-i18n="local"]').textContent = status.provider === "google-free" ? t("googleFree") : status.provider === "azure" ? "Microsoft Azure Translator" : t("local");
+    document.querySelector('[data-i18n="tagline"]').textContent = status.provider === "google-free" ? t("googleFree") : status.provider === "azure" ? "Azure translation for Codex" : t("tagline");
     const models = status.installed_models || [], count = models.length;
     $("model-status").textContent = status.engine_error || (count >= 8 ? t("ready") : t("modelCount", {count}));
     $("model-list").replaceChildren();
@@ -152,7 +175,7 @@
   });
   $("ui-language").addEventListener("change", localize);
   $("workflow").addEventListener("change", chatControls);
-  $("provider").addEventListener("change", () => { if (lastStatus) showModels(lastStatus); });
+  $("provider").addEventListener("change", () => { localize(); });
   document.querySelectorAll("input[name=mode]").forEach(input => input.addEventListener("change", renderResult));
   $("settings-form").addEventListener("submit", async event => {
     event.preventDefault(); $("save").disabled = true;
@@ -163,6 +186,9 @@
   });
   $("translate").addEventListener("click", async () => {
     if (!$("input").value.trim()) { notify(t("pasteFirst"), true); return; }
+    const original = $("input").value;
+    lastResult = {blocks:[{original,translation:original,protected:false}],route:[]};
+    renderResult();
     translationBusy = true;
     $("translate").disabled = true; $("translate").textContent = t("working"); $("input").setAttribute("aria-busy", "true");
     try {
@@ -185,7 +211,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.6.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.7.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }
@@ -195,6 +221,7 @@
       }
       const settings = lastStatus.settings;
       $("provider").value = settings.provider || "offline";
+      localize();
       $("workflow").value = settings.workflow || "desktop";
       $("response-scope").value = settings.response_scope || "final";
       $("chat-presentation").value = settings.chat_presentation || "inline";

@@ -2,6 +2,10 @@
 
 import json
 import secrets
+import select
+import socket
+import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -9,6 +13,34 @@ from importlib.resources import files
 from twintext.config import TwinTextError
 from twintext.mcp import call_tool
 from twintext.service import Service
+
+
+class ConnectionCancellation(threading.Event):
+    """Stop new fragments/retries when the local preview client disconnects."""
+
+    def __init__(self, connection):
+        super().__init__()
+        self.connection = connection
+
+    def is_set(self):
+        if not super().is_set():
+            try:
+                if select.select([self.connection], [], [], 0)[0] and not self.connection.recv(
+                    1, socket.MSG_PEEK
+                ):
+                    self.set()
+            except (OSError, ValueError):
+                self.set()
+        return super().is_set()
+
+    def wait(self, timeout=None):
+        deadline = time.monotonic() + timeout if timeout is not None else float("inf")
+        while not self.is_set():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            super().wait(min(0.1, remaining))
+        return True
 
 
 def html(token="", embedded=False):
@@ -82,7 +114,8 @@ def create_server(port=0, service=None):
                 body = json.loads(self.rfile.read(size))
                 if not isinstance(body, dict):
                     raise TwinTextError("Request must be an object.")
-                result = call_tool(body.get("name"), body.get("arguments", {}), service)
+                result = call_tool(body.get("name"), body.get("arguments", {}), service,
+                                   cancel=ConnectionCancellation(self.connection))
                 self.respond(200, result)
             except (TwinTextError, OSError, ValueError, TypeError, RuntimeError) as exc:
                 self.respond(400, {"error": str(exc)})

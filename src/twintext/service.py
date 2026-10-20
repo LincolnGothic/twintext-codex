@@ -7,13 +7,14 @@ from dataclasses import replace
 
 from twintext import providers
 from twintext.cache import Cache
-from twintext.config import LANGUAGES, TwinTextError, load_settings
+from twintext.config import TRANSLATION_LANGUAGES, TwinTextError, load_settings
 from twintext.engine import detect_language
 from twintext.markdown import blocks, prose, reference_ids, translate_block
 from twintext.usage import CloudUsage, usage_label
 
 MAX_TEXT_LENGTH = 100_000
-QUANTITY_HEADER = {"en": "Quantity", "zh": "数量", "ja": "数量", "fr": "Quantité", "es": "Cantidad"}
+QUANTITY_HEADER = {"en": "Quantity", "zh": "数量", "zh-TW": "數量", "ja": "数量",
+                   "fr": "Quantité", "es": "Cantidad"}
 
 
 class Service:
@@ -64,8 +65,11 @@ class Service:
         if text.strip() and settings.mode != "original":
             content = prose(text)
             if re.search(r"[^\W\d_]", content, re.UNICODE):
-                source = self.detector(content) if source == "auto" else source
-                if source not in LANGUAGES:
+                if source == "auto" and settings.provider != "google-free":
+                    source = self.detector(content)
+                if source not in TRANSLATION_LANGUAGES and not (
+                    source == "auto" and settings.provider == "google-free"
+                ):
                     raise TwinTextError(
                         "Detected language is unsupported. Choose a source language."
                     )
@@ -159,11 +163,12 @@ class Service:
         usage = CloudUsage().snapshot()
         return {
             "settings": settings.as_dict(),
-            "languages": LANGUAGES,
+            "languages": TRANSLATION_LANGUAGES,
             "installed_models": routes,
             "engine_error": error,
             "provider": settings.provider,
             "engine": ("Argos Translate / CTranslate2 CPU" if settings.provider == "offline"
+                       else "Google Free (experimental)" if settings.provider == "google-free"
                        else "Microsoft Azure Translator REST v3"),
             "offline": settings.provider == "offline",
             "azure_configured": configured,
@@ -205,7 +210,8 @@ def context(session_id=None, turn_id=None):
             + (f"Use turn_id={json.dumps(turn_id)} for every delivery in this turn; reuse it "
                "for retries. " if turn_id else "")
             + f"Reader translations use the selected {settings.provider} provider and "
-            f"{LANGUAGES[settings.target]} target; the floating button switches between the "
+            f"{TRANSLATION_LANGUAGES[settings.target]} target; "
+            "the floating button switches between the "
             "bilingual reader and the original conversation. Delivery tool calls use ordinary "
             "Codex tokens; local Stop capture and reader translation return no translations "
             "to model context. Do not translate tool results or hidden reasoning. Explicit "
@@ -231,14 +237,19 @@ def context(session_id=None, turn_id=None):
     )
     return (
         f"TwinText Chat is enabled. Translate selected assistant text into "
-        f"{LANGUAGES[settings.target]} ({settings.target}), using {settings.mode} display. "
+        f"{TRANSLATION_LANGUAGES[settings.target]} ({settings.target}), "
+        f"using {settings.mode} display. "
         + responses + "Questions follow their own setting, independently of response scope. "
         + questions + "For each selected response or question, compose its text "
         "in the conversation's normal source language, "
         "call the local twintext_translate tool with that Markdown, and present its display "
         f"verbatim. Active provider: {settings.provider}. "
         + ("Azure sends source text to Microsoft Azure Translator. "
-           if settings.provider == "azure" else "Offline translation stays on this computer. ")
+           if settings.provider == "azure" else
+           "Google Free sends source text to Google through an experimental, unofficial keyless "
+           "interface; availability, quality and free quota are not guaranteed. "
+           if settings.provider == "google-free" else
+           "Offline translation stays on this computer. ")
         + "This translation workflow uses ordinary Codex tool/context/output "
         "tokens. Preserve code, paths and links. "
         "Do not translate tool results or hidden reasoning. "

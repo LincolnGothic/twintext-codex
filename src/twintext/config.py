@@ -10,11 +10,12 @@ from pathlib import Path
 from twintext.locking import file_lock
 
 LANGUAGES = {"en": "English", "zh": "Chinese", "ja": "Japanese", "fr": "French", "es": "Spanish"}
+TRANSLATION_LANGUAGES = {**LANGUAGES, "zh-TW": "Chinese (Traditional)"}
 MODES = ("bilingual", "translated", "original")
 WORKFLOWS = ("desktop", "chat")
 RESPONSE_SCOPES = ("final", "all")
 CHAT_PRESENTATIONS = ("inline", "floating")
-PROVIDERS = ("offline", "azure")
+PROVIDERS = ("offline", "azure", "google-free")
 
 
 class TwinTextError(Exception):
@@ -72,17 +73,21 @@ class Settings:
 
     def validate(self):
         if self.provider not in PROVIDERS:
-            raise TwinTextError("Provider must be offline or azure.")
+            raise TwinTextError("Provider must be offline, azure or google-free.")
         if self.workflow not in WORKFLOWS:
             raise TwinTextError("Workflow must be desktop or chat.")
         if self.response_scope not in RESPONSE_SCOPES:
             raise TwinTextError("Response scope must be final or all.")
         if self.chat_presentation not in CHAT_PRESENTATIONS:
             raise TwinTextError("Chat presentation must be inline or floating.")
-        if self.source not in ("auto", *LANGUAGES):
-            raise TwinTextError("Source must be auto, en, zh, ja, fr, or es.")
-        if self.target not in LANGUAGES:
-            raise TwinTextError("Target must be en, zh, ja, fr, or es.")
+        if self.source not in ("auto", *TRANSLATION_LANGUAGES):
+            raise TwinTextError("Choose a supported source language.")
+        if self.target not in TRANSLATION_LANGUAGES:
+            raise TwinTextError("Choose a supported target language.")
+        if self.provider != "google-free" and "zh-TW" in (self.source, self.target):
+            raise TwinTextError(
+                "Traditional Chinese requires Google Free; choose Chinese (zh) first."
+            )
         if self.mode not in MODES:
             raise TwinTextError("Mode must be bilingual, translated, or original.")
         if self.ui_language not in ("auto", *LANGUAGES):

@@ -8,8 +8,9 @@ Choose **English, Chinese, Japanese, French or Spanish** for translation. Set th
 TwinText interface language independently, or let Automatic follow the available
 host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
+Google Free (experimental) is an optional keyless online provider. Offline remains the default.
 
-[Download 0.6.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.6.0) ·
+[Download 0.7.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.7.0) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
@@ -21,7 +22,7 @@ Microsoft Azure Translator is an optional provider using your own credentials.
 | **Desktop** | Completed replies in a separate floating window, with a compact draggable button | Automatic translation makes no additional LLM requests and returns no translations to model context |
 
 Chat preserves the original **0.1** experience; Desktop preserves the **0.2.2**
-experience. Version **0.6.0** maintains both through a shared translation engine,
+experience. Version **0.7.0** maintains both through a shared translation engine,
 Markdown parser, language packs and settings. The old releases are historical
 versions; new fixes apply to both styles in the current version.
 
@@ -130,8 +131,8 @@ Choose your operating system and preferred first-install style:
 
 | Operating system | Chat default | Floating-window default | Checksums |
 | --- | --- | --- | --- |
-| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/TwinText-0.6.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/TwinText-0.6.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/SHA256SUMS-linux.txt) |
-| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/TwinText-0.6.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/TwinText-0.6.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.6.0/SHA256SUMS-windows.txt) |
+| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/TwinText-0.7.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/TwinText-0.7.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/SHA256SUMS-linux.txt) |
+| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/TwinText-0.7.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/TwinText-0.7.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.7.0/SHA256SUMS-windows.txt) |
 
 Each ZIP supports **both** styles. Install one package, then switch in settings.
 Check its SHA-256 hash against the matching checksum file before installation.
@@ -329,6 +330,50 @@ with the local month; they are estimates, not billing records. No counter or
 telemetry is sent anywhere. Optional translation caching still stores translation
 text locally, separately from this metadata-only counter.
 
+### Google Free (experimental)
+
+Choose **Translation provider → Google Free (experimental)** in native or web settings.
+Save preferences in the web panel before translating. No API key or language-model
+download is needed for this provider. CLI: `twintext settings --provider google-free`.
+The engine is optional: it never replaces Offline by default or acts as a fallback.
+
+![Blue-gray and indigo native settings with Google Free selected and the experimental-service warning](docs/google-settings.png)
+
+*Isolated native settings preview; the public sample uses the connectivity-test translation.*
+
+> 使用非 Google Cloud 正式支持的免 Key 接口，可能限流、失效或变更；不保证可用性、翻译质量或免费额度。待翻译文本会发送至 Google。
+
+This keyless interface is not officially supported by Google Cloud. It may be rate
+limited, fail or change; availability, translation quality and free quota are not
+guaranteed. Text to translate is sent to Google. It is not the Google Cloud
+Translation API, and no unlimited service or daily allowance is promised.
+
+Requests use the fixed HTTPS endpoint `translate.googleapis.com/translate_a/single`
+from the Python backend, without a public proxy or browser CORS workaround. Existing
+system proxy settings still apply. Google automatic detection uses `sl=auto`;
+`zh` maps to `zh-CN` (Simplified), and `zh-TW` selects Traditional Chinese. The
+existing five interface languages and eight Offline starter models are unchanged.
+Traditional Chinese is Google-only; select `zh` first before switching to Offline
+or Azure. For a Traditional target: `twintext settings --provider google-free --target zh-TW`.
+
+Google requests share a single cross-process file lock, with a 15-second network
+timeout and at most two retries for 429, temporary network errors and recoverable
+5xx responses. Backoff honors valid `Retry-After` seconds or HTTP dates. Other
+rejections, malformed responses and certificate failures are not repeatedly retried.
+An in-flight blocking network call may finish at its timeout before cancellation
+returns; cancellation stops queued requests, remaining chunks and retry waits.
+Closing the native reader or leaving the standalone local preview cancels that work.
+The MCP server also processes `notifications/cancelled` during translation. The
+embedded panel sends cancellation on close/timeout, but Codex must forward it;
+hosts that ignore it cannot guarantee cancellation. No provider fallback occurs.
+
+Text is split at reasonable boundaries within a conservative 1,800-character
+**encoded URL** budget, including the query. This is an implementation choice, not
+an official Google limit. Markdown paragraphs/cells remain separate; responses are
+parsed only for translation segments. Existing local cache keys include provider,
+source, target and original text, with the same clearing/10,000-entry lifecycle.
+Google translations do not affect the Azure-only monthly usage counter.
+
 ### Local records
 
 | Data | Linux default | Windows default |
@@ -367,14 +412,14 @@ On Windows, use `.venv\Scripts\python.exe` and `.venv\Scripts\ruff.exe`; set
 `$env:QT_QPA_PLATFORM = 'offscreen'` before the Qt tests. The development install
 above omits the optional engine; add the `engine` extra for real-model work.
 
-Version 0.6.0 includes **124 regression tests** for Windows and Linux with Python
+Version 0.7.0 includes **140 regression tests** for Windows and Linux with Python
 3.10, 3.12 and 3.13. The release workflow also validates installation from ZIPs,
 native hooks, real Offline English→Chinese tables, Qt rendering and preservation
-of settings/models on upgrade. [Release notes](docs/release-0.6.0.md).
+of settings/models on upgrade. [Release notes](docs/release-0.7.0.md).
 Interactive Codex sessions, hook trust and compositor behavior still require host testing.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.6.0.md). Report bugs with your OS, Python/Codex/
+and [release notes](docs/release-0.7.0.md). Report bugs with your OS, Python/Codex/
 TwinText versions, style, language pair and a sanitized Markdown example; avoid
 posting private conversations or local databases.
 

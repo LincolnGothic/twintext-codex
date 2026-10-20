@@ -31,6 +31,26 @@ class PendingTranslator:
 
 
 class DesktopTests(unittest.TestCase):
+    def test_google_provider_is_localized_and_failure_keeps_original(self):
+        self.window.settings = update_settings(provider="google-free", target="zh-TW")
+        self.window.localize()
+        for language in LANGUAGES:
+            self.window.settings = update_settings(ui_language=language)
+            self.window.localize()
+            combo = self.window.selects["provider"]
+            self.assertEqual(combo.currentData(), "google-free")
+            self.assertIn("Google", combo.currentText())
+            self.assertTrue(self.window.google_notice.text())
+            self.assertEqual(self.window.selects["target"].currentData(), "zh-TW")
+            self.assertEqual(self.window.selects["ui"].findData("zh-TW"), -1)
+        self.inbox.publish(payload(text="Original answer"))
+        self.window.poll()
+        revision = self.worker.jobs[-1][0]
+        self.worker.results.put((revision, None, "Google Free network request failed."))
+        self.window.poll()
+        self.assertEqual(self.window.reader.toPlainText(), "Original answer")
+        self.assertIn("Google Free", self.window.status.text())
+
     def test_native_preferences_can_choose_floating_before_switching_to_chat(self):
         presentation = self.window.selects["chat_presentation"]
         self.assertTrue(presentation.isEnabled())
