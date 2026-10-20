@@ -120,7 +120,7 @@ def main():
             "from types import SimpleNamespace; import queue; "
             "app=QApplication([]); worker=SimpleNamespace(submit=lambda *args: None, "
             "results=queue.SimpleQueue()); window=Companion(translator=worker); "
-            "assert window.selects['workflow'].currentData() == 'desktop'; "
+            "assert window.selects['location'].currentData() == 'desktop'; "
             "window.reader.setMarkdown(" + repr(TABLE) + "); "
             "assert 'Fresh red apples' in window.reader.toPlainText(); "
             "window.hide(); window.orb.hide(); print('Native Qt and both hooks passed')"
