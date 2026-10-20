@@ -29,13 +29,11 @@ from PySide6.QtWidgets import (
 from twintext.bridge import Inbox, desktop_lock
 from twintext.cache import Cache
 from twintext.config import (
-    CHAT_PRESENTATIONS,
     LANGUAGES,
     MODES,
     PROVIDERS,
     RESPONSE_SCOPES,
     TRANSLATION_LANGUAGES,
-    WORKFLOWS,
     TwinTextError,
     load_settings,
     update_settings,
@@ -309,6 +307,24 @@ for _language, _labels in {
     )))
 
 for _language, _labels in {
+    "en": ("Display location", "In Codex conversation", "Floating reader beside Codex",
+           "Desktop reader (completed replies)", "Back to reader"),
+    "zh": ("显示方式", "在 Codex 对话中显示", "Codex 旁浮动阅读器",
+           "桌面阅读器（仅完整回复）", "返回阅读"),
+    "ja": ("表示場所", "Codex の会話内", "Codex 横のフローティングリーダー",
+           "デスクトップリーダー（完了した返信）", "リーダーに戻る"),
+    "fr": ("Lieu d’affichage", "Dans la conversation Codex", "Lecteur flottant à côté de Codex",
+           "Lecteur de bureau (réponses terminées)", "Retour au lecteur"),
+    "es": ("Lugar de visualización", "En la conversación de Codex", "Lector flotante junto a Codex",
+           "Lector de escritorio (respuestas completas)", "Volver al lector"),
+}.items():
+    WORDS[_language].update(dict(zip(
+        ("location", "chat-inline", "chat-floating", "desktop-reader", "back"),
+        _labels, strict=True,
+    )))
+
+
+for _language, _labels in {
     "en": ("Chat presentation", "In conversation", "Floating button and reader", "Copy original"),
     "zh": ("聊天显示方式", "在对话中显示", "浮动按钮和阅读器", "复制原文"),
     "ja": ("チャットの表示", "会話内", "フローティングボタンとリーダー", "原文をコピー"),
@@ -469,6 +485,8 @@ class Companion(QWidget):
         self.revision = 0
         self.text = ""
         self.last_result = None
+        self.show_translation = self.settings.mode != "original"
+        self.paste_visible = False
         self.reply_id = None
         self.pending_translation = None
         self.rows = []
@@ -511,7 +529,7 @@ class Companion(QWidget):
         form = QFormLayout(self.preferences)
         self.selects = {}
         self.labels = {}
-        for key in ("provider", "workflow", "chat_presentation", "response_scope", "source",
+        for key in ("provider", "location", "response_scope", "source",
                     "target", "mode", "ui"):
             label = QLabel()
             combo = NoWheelComboBox()
@@ -544,9 +562,8 @@ class Companion(QWidget):
         self.preference_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.preference_scroll.setWidget(self.preferences)
         self.preference_scroll.setMinimumHeight(140)
-        self.preference_scroll.setMaximumHeight(360)
         self.preference_scroll.hide()
-        layout.addWidget(self.preference_scroll)
+        layout.addWidget(self.preference_scroll, 1)
         self.reader = Reader()
         self.reader.setOpenLinks(False)
         self.reader.setOpenExternalLinks(False)
@@ -560,13 +577,19 @@ class Companion(QWidget):
         self.editor.setMaximumHeight(105)
         self.editor.hide()
         layout.addWidget(self.editor)
-        actions = QHBoxLayout()
+        paste_actions = QHBoxLayout()
         self.paste_button = QPushButton()
         self.translate_button = QPushButton()
         self.translate_button.hide()
+        self.toggle_button = QPushButton()
+        self.toggle_button.setEnabled(False)
         self.copy_button = QPushButton()
         self.copy_button.setEnabled(False)
-        for button in (self.paste_button, self.translate_button, self.copy_button):
+        for button in (self.paste_button, self.translate_button):
+            paste_actions.addWidget(button)
+        layout.addLayout(paste_actions)
+        actions = QHBoxLayout()
+        for button in (self.toggle_button, self.copy_button):
             actions.addWidget(button)
         layout.addLayout(actions)
         footer = QHBoxLayout()
@@ -610,13 +633,12 @@ class Companion(QWidget):
         self.orb.setStyleSheet(STYLE)
         self.localize()
         self.apply_pin()
-        self.settings_button.clicked.connect(
-            lambda: self.preference_scroll.setVisible(not self.preference_scroll.isVisible())
-        )
+        self.settings_button.clicked.connect(self.toggle_settings)
         self.collapse_button.clicked.connect(self.collapse)
         self.cache_button.clicked.connect(self.clear_cache)
         self.paste_button.clicked.connect(self.paste)
         self.translate_button.clicked.connect(self.translate_manual)
+        self.toggle_button.clicked.connect(self.toggle_translation)
         self.copy_button.clicked.connect(self.copy)
         self.clear_button.clicked.connect(self.clear)
         self.quit_button.clicked.connect(self.quit)
@@ -649,6 +671,9 @@ class Companion(QWidget):
             (self.quit_button, "quit"),
         ):
             button.setText(self.t(key))
+        if not self.preference_scroll.isHidden():
+            self.settings_button.setText(self.t("back"))
+        self.toggle_button.setText(self.t("original" if self.show_translation else "translate"))
         if self.settings.floating_chat:
             self.copy_button.setText(self.t("copy_original"))
         self.orb_handle.setVisible(not self.settings.floating_chat)
@@ -692,8 +717,8 @@ class Companion(QWidget):
         for key, combo in self.selects.items():
             combo.blockSignals(True)
             combo.clear()
-            codes = (PROVIDERS if key == "provider" else WORKFLOWS if key == "workflow"
-                     else CHAT_PRESENTATIONS if key == "chat_presentation"
+            codes = (PROVIDERS if key == "provider"
+                     else ("chat-inline", "chat-floating", "desktop") if key == "location"
                      else RESPONSE_SCOPES if key == "response_scope"
                      else MODES if key == "mode"
                      else list(TRANSLATION_LANGUAGES) if key in ("source", "target")
@@ -703,9 +728,15 @@ class Companion(QWidget):
             for code in codes:
                 label = (self.t("google-free") if code == "google-free" else
                          "Offline — Argos" if code == "offline" else "Microsoft Azure Translator")
-                combo.addItem(label if key == "provider" else self.t(code), code)
+                if key != "provider":
+                    label = self.t("desktop-reader" if key == "location" and code == "desktop"
+                                   else code)
+                combo.addItem(label, code)
             field = "ui_language" if key == "ui" else key
-            combo.setCurrentIndex(combo.findData(getattr(self.settings, field)))
+            value = ("chat-" + self.settings.chat_presentation
+                     if self.settings.workflow == "chat" else "desktop") if key == "location" \
+                else getattr(self.settings, field)
+            combo.setCurrentIndex(combo.findData(value))
             combo.blockSignals(False)
             self.labels[key].setText(self.t(key))
         for key, box in self.checks.items():
@@ -714,8 +745,6 @@ class Companion(QWidget):
             box.setChecked(getattr(self.settings, field))
             box.setText(self.t(key))
             box.blockSignals(False)
-        # Choose the presentation before switching: inline Chat closes this window.
-        self.selects["chat_presentation"].setToolTip(self.t("chat_hint"))
         for control in (self.selects["response_scope"], self.checks["translate_questions"]):
             control.setEnabled(self.settings.workflow == "chat")
             control.setToolTip(self.t("chat_hint"))
@@ -735,10 +764,12 @@ class Companion(QWidget):
     def save_preferences(self):
         previous = self.settings
         try:
+            location = self.selects["location"].currentData()
             self.settings = update_settings(
                 provider=self.selects["provider"].currentData(),
-                workflow=self.selects["workflow"].currentData(),
-                chat_presentation=self.selects["chat_presentation"].currentData(),
+                workflow="desktop" if location == "desktop" else "chat",
+                chat_presentation=(previous.chat_presentation if location == "desktop"
+                                   else location.removeprefix("chat-")),
                 response_scope=self.selects["response_scope"].currentData(),
                 translate_questions=self.checks["translate_questions"].isChecked(),
                 source=self.selects["source"].currentData(),
@@ -750,15 +781,18 @@ class Companion(QWidget):
                 desktop_auto_start=self.checks["start"].isChecked(),
                 always_on_top=self.checks["pin"].isChecked(),
             )
-            self.settings_changed(previous)
+            self.settings_changed(previous, keep_settings=not self.preference_scroll.isHidden())
         except (TwinTextError, OSError) as exc:
             self.status.setText(str(exc))
 
-    def settings_changed(self, previous):
+    def settings_changed(self, previous, keep_settings=False):
         self.localize()
         if ((previous.workflow == "desktop" or previous.floating_chat)
                 and self.settings.workflow == "chat" and not self.settings.floating_chat):
-            self.quit()
+            if keep_settings:
+                self.orb.hide()
+            else:
+                self.quit()
             return
         if previous.floating_chat != self.settings.floating_chat:
             self.ids = ()
@@ -774,6 +808,7 @@ class Companion(QWidget):
         ):
             self.translate_current()
         elif previous.mode != self.settings.mode:
+            self.show_translation = self.settings.mode != "original"
             if self.settings.mode == "original":
                 self.revision += 1
                 self.cancel_translation()
@@ -782,6 +817,22 @@ class Companion(QWidget):
                 self.render_result()
             else:
                 self.translate_current()
+            self.localize()
+
+    def toggle_settings(self):
+        opening = self.preference_scroll.isHidden()
+        if opening:
+            self.paste_visible = not self.editor.isHidden()
+        elif self.settings.workflow == "chat" and not self.settings.floating_chat:
+            self.quit()
+            return
+        self.preference_scroll.setVisible(opening)
+        for widget in (self.sessions, self.reader, self.paste_button,
+                       self.toggle_button, self.copy_button, self.clear_button):
+            widget.setVisible(not opening)
+        for widget in (self.editor, self.translate_button):
+            widget.setVisible(not opening and self.paste_visible)
+        self.localize()
 
     def configure_azure(self):
         region, accepted = QInputDialog.getText(
@@ -835,6 +886,9 @@ class Companion(QWidget):
 
     def collapse(self):
         if self.quitting:
+            return
+        if self.settings.workflow == "chat" and not self.settings.floating_chat:
+            self.quit()
             return
         self.hide()
         self.orb.show()
@@ -890,10 +944,14 @@ class Companion(QWidget):
             self.reply_id = self.rows[index]["id"] if self.settings.floating_chat else None
             self.translate_current()
 
-    def translate_current(self):
+    def translate_current(self, show_translation=None):
         self.revision += 1
         self.cancel_translation()
         self.last_result = None
+        self.show_translation = (self.settings.mode != "original" if show_translation is None
+                                 else show_translation)
+        self.toggle_button.setEnabled(bool(self.text))
+        self.toggle_button.setText(self.t("original" if self.show_translation else "translate"))
         self.copy_button.setEnabled(bool(self.text))
         self.reader.setMarkdown(self.text or self.t("empty"))
         self.pending_translation = (
@@ -907,7 +965,7 @@ class Companion(QWidget):
             self.status_key = "ready"
             self.update_status()
             return
-        if self.text and self.settings.mode != "original":
+        if self.text and self.show_translation:
             self.status_key = "working"
             self.translator.submit(
                 self.revision, self.text, self.settings.source, self.settings.target
@@ -922,10 +980,30 @@ class Companion(QWidget):
             cancel()
 
     def render_result(self):
-        self.reader.setMarkdown(display_text(self.last_result, self.settings.mode))
+        self.reader.setMarkdown(display_text(self.last_result, self.reader_mode()))
+
+    def reader_mode(self):
+        if not self.show_translation:
+            return "original"
+        return "bilingual" if self.settings.mode == "original" else self.settings.mode
+
+    def toggle_translation(self):
+        if self.show_translation:
+            self.show_translation = False
+            self.revision += 1
+            self.cancel_translation()
+            self.reader.setMarkdown(self.text)
+            self.status_key = "ready"
+            self.update_status()
+        elif self.last_result:
+            self.show_translation = True
+            self.render_result()
+        else:
+            self.translate_current(show_translation=True)
+        self.toggle_button.setText(self.t("original" if self.show_translation else "translate"))
 
     def copy(self):
-        text = (display_text(self.last_result, self.settings.mode)
+        text = (display_text(self.last_result, self.reader_mode())
                 if self.last_result and not self.settings.floating_chat else self.text)
         QApplication.clipboard().setText(text)
 
@@ -941,6 +1019,7 @@ class Companion(QWidget):
         self.sessions.clear()
         self.editor.clear()
         self.copy_button.setEnabled(False)
+        self.toggle_button.setEnabled(False)
         self.status_key = "waiting"
         self.localize()
 
@@ -989,6 +1068,8 @@ class Companion(QWidget):
                 if revision != self.revision:
                     continue
                 if error:
+                    self.show_translation = False
+                    self.toggle_button.setText(self.t("translate"))
                     self.status_key = "error"
                     self.status.setText(self.t("error") + ": " + error)
                 else:

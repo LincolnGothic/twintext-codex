@@ -43,6 +43,14 @@
     es: {provider:"Motor de traducción",googleFree:"Google gratis (experimental)","zh-TW":"Chino (tradicional)",googleNotice:"Interfaz sin clave sin soporte oficial de Google Cloud. Puede limitarse, fallar o cambiar; no se garantizan disponibilidad, calidad ni cuota gratuita. El texto a traducir se envía a Google."}
   };
   for (const [code, words] of Object.entries(providerWords)) Object.assign(translations[code], words);
+  const locationWords = {
+    en:{location:"Display location", "chat-inline":"In Codex conversation", "chat-floating":"Floating reader beside Codex", "desktop-reader":"Desktop reader (completed replies)"},
+    zh:{location:"显示方式", "chat-inline":"在 Codex 对话中显示", "chat-floating":"Codex 旁浮动阅读器", "desktop-reader":"桌面阅读器（仅完整回复）"},
+    ja:{location:"表示場所", "chat-inline":"Codex の会話内", "chat-floating":"Codex 横のフローティングリーダー", "desktop-reader":"デスクトップリーダー（完了した返信）"},
+    fr:{location:"Lieu d’affichage", "chat-inline":"Dans la conversation Codex", "chat-floating":"Lecteur flottant à côté de Codex", "desktop-reader":"Lecteur de bureau (réponses terminées)"},
+    es:{location:"Lugar de visualización", "chat-inline":"En la conversación de Codex", "chat-floating":"Lector flotante junto a Codex", "desktop-reader":"Lector de escritorio (respuestas completas)"}
+  };
+  for (const [code, words] of Object.entries(locationWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
   let translationBusy = false, modelsBusy = false;
   let bridgeId = 0;
@@ -108,15 +116,12 @@
     for (const element of document.querySelectorAll("[data-i18n]")) element.textContent = t(element.dataset.i18n);
     for (const element of document.querySelectorAll("[data-placeholder]")) element.placeholder = t(element.dataset.placeholder);
     selectOptions($("source"), "auto"); selectOptions($("target")); selectOptions($("ui-language"), "follow");
-    const workflow = $("workflow").value || "desktop";
-    $("workflow").replaceChildren(new Option(t("desktop"), "desktop"), new Option(t("chat"), "chat"));
-    $("workflow").value = workflow;
+    const location = $("location").value || "desktop";
+    $("location").replaceChildren(new Option(t("chat-inline"), "chat-inline"), new Option(t("chat-floating"), "chat-floating"), new Option(t("desktop-reader"), "desktop"));
+    $("location").value = location;
     const scope = $("response-scope").value || "final";
     $("response-scope").replaceChildren(new Option(t("final"), "final"), new Option(t("all"), "all"));
     $("response-scope").value = scope;
-    const presentation = $("chat-presentation").value || "inline";
-    $("chat-presentation").replaceChildren(new Option(t("inline"), "inline"), new Option(t("floating"), "floating"));
-    $("chat-presentation").value = presentation;
     chatControls();
     $("ui-language").value = chosen;
     if (lastStatus) showModels(lastStatus);
@@ -124,9 +129,8 @@
     if (boot.embedded) window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/size-changed",params:{height:document.documentElement.scrollHeight}}, "*");
   }
   function chatControls() {
-    const desktop = $("workflow").value !== "chat";
+    const desktop = $("location").value === "desktop";
     $("response-scope").disabled = desktop;
-    $("chat-presentation").disabled = desktop;
     $("translate-questions").disabled = desktop;
   }
   function showModels(status) {
@@ -174,13 +178,14 @@
     catch (error) { notify(error.message, true); }
   });
   $("ui-language").addEventListener("change", localize);
-  $("workflow").addEventListener("change", chatControls);
+  $("location").addEventListener("change", chatControls);
   $("provider").addEventListener("change", () => { localize(); });
   document.querySelectorAll("input[name=mode]").forEach(input => input.addEventListener("change", renderResult));
   $("settings-form").addEventListener("submit", async event => {
     event.preventDefault(); $("save").disabled = true;
     try {
-      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:$("workflow").value,chat_presentation:$("chat-presentation").value,response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
+      const location = $("location").value;
+      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:location === "desktop" ? "desktop" : "chat",chat_presentation:location === "desktop" ? lastStatus.settings.chat_presentation || "inline" : location.slice(5),response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
       localize(); notify(t("saved"));
     } catch (error) { notify(error.message, true); } finally { $("save").disabled = false; }
   });
@@ -211,7 +216,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.7.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.7.1"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }
@@ -222,9 +227,8 @@
       const settings = lastStatus.settings;
       $("provider").value = settings.provider || "offline";
       localize();
-      $("workflow").value = settings.workflow || "desktop";
+      $("location").value = settings.workflow === "chat" ? "chat-" + (settings.chat_presentation || "inline") : "desktop";
       $("response-scope").value = settings.response_scope || "final";
-      $("chat-presentation").value = settings.chat_presentation || "inline";
       $("translate-questions").checked = settings.translate_questions ?? true;
       $("target").value = settings.target; $("source").value = settings.source; $("ui-language").value = settings.ui_language;
       document.querySelector(`input[name=mode][value=${settings.mode}]`).checked = true;
