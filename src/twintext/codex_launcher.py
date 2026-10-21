@@ -4,6 +4,7 @@ import json
 import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from twintext.bridge import launch_desktop
@@ -19,7 +20,10 @@ $taskPackage = Get-AppxPackage -Name OpenAI.Codex |
     Sort-Object Version -Descending | Select-Object -First 1
 if (-not $taskPackage) { throw 'Codex is not installed for this user.' }
 $taskFolder = Join-Path $taskPackage.InstallLocation 'app'
-$taskExecutable = Join-Path $taskFolder 'Codex.exe'
+$taskExecutable = Join-Path $taskFolder 'ChatGPT.exe'
+if (-not (Test-Path -LiteralPath $taskExecutable -PathType Leaf)) {
+    $taskExecutable = Join-Path $taskFolder 'Codex.exe'
+}
 $taskRunning = @(Get-CimInstance Win32_Process | Where-Object {
     $_.Name -in @('Codex.exe', 'ChatGPT.exe') -and $_.ExecutablePath -and
     $_.ExecutablePath.StartsWith($taskFolder + '\\', [StringComparison]::OrdinalIgnoreCase)
@@ -34,7 +38,8 @@ $taskRunning = @(Get-CimInstance Win32_Process | Where-Object {
         )
         value = json.loads(result.stdout)
         executable = Path(value["executable"])
-        if not executable.is_file() or executable.name.lower() != "codex.exe":
+        if (not executable.is_file()
+                or executable.name.lower() not in ("codex.exe", "chatgpt.exe")):
             raise ValueError("Codex executable not found")
         return executable, bool(value["running"])
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
@@ -51,6 +56,24 @@ def check_port():
         ) from exc
 
 
+def wait_for_debugging(process):
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        code = process.poll()
+        if code is not None:
+            raise TwinTextError(f"Codex exited during startup (exit code {code}).")
+        try:
+            with socket.create_connection(("127.0.0.1", PORT), timeout=0.5):
+                return
+        except OSError:
+            time.sleep(0.2)
+    raise TwinTextError(
+        f"Codex did not open its debugging port on 127.0.0.1:{PORT} within 20 seconds. "
+        "It may reject debugging or still have another instance running. "
+        "Exit Codex/ChatGPT normally before retrying; TwinText has not closed it."
+    )
+
+
 def launch():
     if sys.platform != "win32":
         raise TwinTextError(
@@ -65,16 +88,18 @@ def launch():
     executable, running = windows_app()
     if running:
         raise TwinTextError(
-            "Exit Codex (and its shared ChatGPT window, if open), then run this launcher again. "
+            "Exit Codex and its shared ChatGPT app, including any background/tray instance, "
+            "then run this launcher again. Pressing a key only closes this error window. "
             "TwinText will not close an active conversation."
         )
     check_port()
-    subprocess.Popen(
+    process = subprocess.Popen(
         [str(executable), "--remote-debugging-address=127.0.0.1",
          f"--remote-debugging-port={PORT}"],
         creationflags=(getattr(subprocess, "DETACHED_PROCESS", 0)
                        | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
+    wait_for_debugging(process)
     launch_desktop()
     return {"launched": True, "experimental": True, "port": PORT}
