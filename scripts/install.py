@@ -48,14 +48,28 @@ def windows_launchers(app):
     scripts = app / "venv/Scripts"
     python = scripts / "python.exe"
     pythonw = scripts / "pythonw.exe"
+    portable = os.environ.get("TWINTEXT_HOME")
+    roaming = Path(os.environ.get("APPDATA", str(Path.home() / "AppData/Roaming")))
+    data = Path(portable or os.environ.get("TWINTEXT_DATA_DIR") or app).expanduser().resolve()
+    settings = Path(portable or os.environ.get("TWINTEXT_CONFIG_DIR")
+                    or roaming / "TwinText").expanduser().resolve()
+    header = '@echo off\r\nsetlocal DisableDelayedExpansion\r\n'
+    locations = (
+        f'set "TWINTEXT_DATA_DIR={str(data).replace("%", "%%")}"\r\n'
+        f'set "TWINTEXT_CONFIG_DIR={str(settings).replace("%", "%%")}"\r\n'
+    )
     (app / "TwinText.cmd").write_text(
-        f'@echo off\r\n"{python}" -m twintext.cli %*\r\n', encoding="utf-8"
+        header + locations + f'"{str(python).replace("%", "%%")}" -m twintext.cli %*\r\n',
+        encoding="utf-8", newline="",
     )
     (app / "Open TwinText.cmd").write_text(
-        f'@echo off\r\nstart "" "{pythonw}" -m twintext.cli desktop\r\n', encoding="utf-8"
+        header + locations
+        + f'start "" "{str(pythonw).replace("%", "%%")}" -m twintext.cli desktop\r\n',
+        encoding="utf-8", newline="",
     )
     (app / "Open Codex with TwinText.cmd").write_text(
-        f'@echo off\r\n"{str(python).replace("%", "%%")}" -m twintext.cli codex-launch --wait\r\n'
+        header + 'set "TWINTEXT_HOME="\r\n' + locations
+        + f'"{str(python).replace("%", "%%")}" -m twintext.cli codex-launch --wait\r\n'
         'if errorlevel 130 exit /b 130\r\nif errorlevel 1 pause\r\n',
         encoding="utf-8", newline="",
     )

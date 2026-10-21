@@ -49,18 +49,50 @@ class InstallationTests(unittest.TestCase):
         app = self.home / "TwinText %test%"
         app.mkdir()
         install = runpy.run_path(str(ROOT / "scripts/install.py"))
-        with (patch.dict(os.environ, APPDATA=str(self.home / "appdata")),
+        with (patch.dict(os.environ, APPDATA=str(self.home / "appdata"), TWINTEXT_HOME="",
+                         TWINTEXT_CONFIG_DIR="", TWINTEXT_DATA_DIR=""),
               patch("subprocess.run")):
             install["windows_launchers"](app)
         batch = (app / "Open Codex with TwinText.cmd").read_bytes()
         interpreter = self.home / "TwinText %%test%%/venv/Scripts/python.exe"
         self.assertEqual(batch.split(b"\r\n"), [
             b"@echo off",
+            b"setlocal DisableDelayedExpansion",
+            b'set "TWINTEXT_HOME="',
+            f'set "TWINTEXT_DATA_DIR={self.home / "TwinText %%test%%"}"'.encode(),
+            f'set "TWINTEXT_CONFIG_DIR={self.home / "appdata/TwinText"}"'.encode(),
             f'"{interpreter}" -m twintext.cli codex-launch --wait'.encode(),
             b"if errorlevel 130 exit /b 130",
             b"if errorlevel 1 pause",
             b"",
         ])
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows command interpreter")
+    def test_windows_launcher_preserves_percent_and_bang_in_settings_paths(self):
+        app = self.home / "TwinText %test% !TASK_LAUNCHER_PROFILE!"
+        app.mkdir()
+        settings = self.home / "settings %test% !TASK_LAUNCHER_PROFILE!"
+        install = runpy.run_path(str(ROOT / "scripts/install.py"))
+        environment = dict(os.environ, TWINTEXT_HOME="", TWINTEXT_DATA_DIR=str(app),
+                           TWINTEXT_CONFIG_DIR=str(settings), TASK_LAUNCHER_PROFILE="wrong")
+        with patch.dict(os.environ, environment), patch("subprocess.run"):
+            install["windows_launchers"](app)
+        probe = self.home / "probe.py"
+        probe.write_text(
+            "import json, os\nprint(json.dumps([os.environ['TWINTEXT_DATA_DIR'], "
+            "os.environ['TWINTEXT_CONFIG_DIR']]))\n", encoding="utf-8",
+        )
+        launcher = (app / "Open Codex with TwinText.cmd").read_text(encoding="utf-8")
+        interpreter = str(app / "venv/Scripts/python.exe").replace("%", "%%")
+        prefix, separator, _ = launcher.partition(f'"{interpreter}"')
+        self.assertTrue(separator)
+        batch = self.home / "probe.cmd"
+        batch.write_text(prefix + f'"{sys.executable}" "{probe}"\n', encoding="utf-8")
+        result = subprocess.run(
+            f'cmd.exe /d /v:on /s /c ""{batch}""', env=environment,
+            text=True, capture_output=True, check=True, timeout=10,
+        )
+        self.assertEqual(json.loads(result.stdout), [str(app.resolve()), str(settings.resolve())])
 
     def test_registration_preserves_marketplace_and_other_plugins(self):
         other = {"name": "existing", "source": {"source": "local", "path": "./existing"}}

@@ -92,6 +92,17 @@ data folder, even after the terminal closes. It contains startup metadata and
 errors, not conversation text or translation credentials. CLI users can run
 `twintext codex-launch --wait`; without `--wait`, an existing app is still an error.
 
+If it says to enable floating reader/message buttons but those options are already
+saved, compare the **Settings file** printed by version **0.9.3** with your intended
+profile. Its Windows CMD launchers pin the installation's resolved data/settings
+paths; the dedicated Codex launcher uses that installed profile even if the parent
+shell has an inherited portable override. Ordinary CLI portable `TWINTEXT_HOME`
+behavior is retained. Separate `TWINTEXT_DATA_DIR`/`TWINTEXT_CONFIG_DIR` apply when
+that portable override is absent. These are process-local TwinText overrides;
+Windows AppData and other applications' profiles remain unchanged. No preferences
+are silently enabled or reset. The log also prints enabled/workflow/presentation/
+message-buttons flags without chat text or credentials.
+
 If it says Codex is running, exit both Codex and its shared ChatGPT app normally,
 including any background/tray instance, before double-clicking **Open Codex with
 TwinText.cmd** in File Explorer. Closing a chat window alone can leave the app

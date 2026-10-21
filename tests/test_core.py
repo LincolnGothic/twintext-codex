@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from twintext.cache import Cache
-from twintext.config import TwinTextError, load_settings, update_settings
+from twintext.config import TwinTextError, config_dir, data_dir, load_settings, update_settings
 from twintext.engine import ArgosEngine, sentence_chunks, validate_model_archive
 from twintext.markdown import blocks
 from twintext.service import Service, context
@@ -64,6 +64,32 @@ class CoreTests(unittest.TestCase):
             self.assertEqual(
                 Path(self.directory.name, "settings.json").stat().st_mode & 0o777, 0o600
             )
+
+    def test_explicit_installed_paths_keep_settings_when_shell_folders_differ(self):
+        root = Path(self.directory.name)
+        preferences, data = root / "installed-settings", root / "installed-data"
+        with patch.dict(os.environ, TWINTEXT_HOME=str(preferences)):
+            update_settings(provider="google-free", target="zh", workflow="chat",
+                            chat_presentation="floating", message_buttons=True)
+        with patch.dict(os.environ, TWINTEXT_HOME="", TWINTEXT_CONFIG_DIR=str(preferences),
+                        TWINTEXT_DATA_DIR=str(data), APPDATA=str(root / "other-roaming"),
+                        LOCALAPPDATA=str(root / "other-local")):
+            self.assertTrue(load_settings().manual_reader)
+            self.assertEqual(load_settings().provider, "google-free")
+            self.assertEqual(load_settings().target, "zh")
+            self.assertEqual(config_dir(), preferences)
+            self.assertEqual(data_dir(), data)
+            update_settings(mode="translated")
+        with patch.dict(os.environ, TWINTEXT_HOME=str(preferences)):
+            self.assertEqual(load_settings().mode, "translated")
+        self.assertFalse((root / "other-roaming/TwinText/settings.json").exists())
+
+    def test_portable_home_overrides_inherited_installed_directories(self):
+        with patch.dict(os.environ, TWINTEXT_CONFIG_DIR=str(Path(self.directory.name) / "other"),
+                        TWINTEXT_DATA_DIR=str(Path(self.directory.name) / "other")):
+            self.assertEqual(load_settings().target, "zh")
+            self.assertEqual(config_dir(), Path(self.directory.name))
+            self.assertEqual(data_dir(), Path(self.directory.name))
 
     def test_corrupt_settings_fail_explicitly(self):
         Path(self.directory.name, "settings.json").write_text("[]")
