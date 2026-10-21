@@ -86,6 +86,10 @@ class LauncherTests(unittest.TestCase):
         log = self.folder / "desktop/launcher.log"
         self.assertTrue(log.is_file(), "The terminal error must remain available after dismissal")
         self.assertIn("Exit Codex", log.read_text(encoding="utf-8"))
+        self.assertIn(
+            str((self.folder / "settings.json").resolve()), log.read_text(encoding="utf-8")
+        )
+        self.assertIn("message_buttons=True", log.read_text(encoding="utf-8"))
 
     def test_wait_option_is_explicit_in_cli(self):
         self.assertTrue(parser().parse_args(["codex-launch", "--wait"]).wait)

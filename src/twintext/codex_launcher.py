@@ -10,7 +10,7 @@ from pathlib import Path
 
 from twintext import __version__
 from twintext.bridge import launch_desktop
-from twintext.config import TwinTextError, data_dir, load_settings, private_dir
+from twintext.config import TwinTextError, config_dir, data_dir, load_settings, private_dir
 from twintext.message_adapter import PORT
 
 
@@ -91,6 +91,7 @@ def launch(wait=False):
             print(message, file=log, flush=True)
 
         report(f"Startup log: {path.resolve()}")
+        report(f"Python: {sys.executable}")
         try:
             return _launch(wait, report)
         except KeyboardInterrupt:
@@ -103,6 +104,10 @@ def launch(wait=False):
 
 def _launch(wait, report):
     settings = load_settings()
+    report(f"Settings file: {(config_dir() / 'settings.json').resolve()}")
+    report(f"enabled={settings.enabled}, workflow={settings.workflow}, "
+           f"chat_presentation={settings.chat_presentation}, "
+           f"message_buttons={settings.message_buttons}")
     if not settings.manual_reader or not settings.enabled:
         raise TwinTextError(
             "In TwinText settings choose Floating reader beside Codex, enable translation "

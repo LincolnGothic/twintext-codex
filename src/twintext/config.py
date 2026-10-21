@@ -24,7 +24,7 @@ class TwinTextError(Exception):
 
 
 def data_dir() -> Path:
-    override = os.environ.get("TWINTEXT_HOME")
+    override = os.environ.get("TWINTEXT_HOME") or os.environ.get("TWINTEXT_DATA_DIR")
     if not override and sys.platform == "win32":
         return Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "TwinText"
     return (
@@ -35,7 +35,7 @@ def data_dir() -> Path:
 
 
 def config_dir() -> Path:
-    override = os.environ.get("TWINTEXT_HOME")
+    override = os.environ.get("TWINTEXT_HOME") or os.environ.get("TWINTEXT_CONFIG_DIR")
     if not override and sys.platform == "win32":
         return Path(os.environ.get("APPDATA", str(Path.home() / "AppData/Roaming"))) / "TwinText"
     return (
