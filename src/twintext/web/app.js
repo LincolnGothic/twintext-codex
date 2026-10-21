@@ -28,11 +28,11 @@
   };
   for (const [code, words] of Object.entries(followWords)) Object.assign(translations[code], words);
   const messageWords = {
-    en:{manualReaderHint:"Click Translate / Original on a completed Codex reply. Windows requires Open Codex with TwinText.cmd; Linux uses manual Paste. Codex UI changes may affect buttons.",sessionCache:"Only remember translations until TwinText exits",sessionCacheHint:"Fragments and reader translations stay in memory. Existing disk cache is ignored; Clear cache removes it. Originals and settings are kept."},
-    zh:{manualReaderHint:"点击 Codex 已完成回复下的 Translate / Original。Windows 需使用 Open Codex with TwinText.cmd；Linux 可手动粘贴。Codex 界面变更可能影响按钮。",sessionCache:"仅本次运行缓存译文（退出后释放）",sessionCacheHint:"翻译片段和阅读器译文仅存于内存，忽略旧磁盘缓存。点击“清除缓存”可清除旧译文，保留原文和设置。"},
-    ja:{manualReaderHint:"完了した返信の Translate / Original をクリック。Windows は Open Codex with TwinText.cmd、Linux は手動貼り付けを使用します。Codex の UI 変更でボタンに影響する場合があります。",sessionCache:"TwinText 終了まで訳文を記憶",sessionCacheHint:"断片とリーダー訳文はメモリ内のみ。既存のディスクキャッシュは無視し、キャッシュ消去で削除。原文と設定は保持します。"},
-    fr:{manualReaderHint:"Cliquez sur Translate / Original sous une réponse terminée. Windows nécessite Open Codex with TwinText.cmd ; Linux utilise le collage manuel. Les changements de Codex peuvent affecter les boutons.",sessionCache:"Garder les traductions jusqu’à la fermeture de TwinText",sessionCacheHint:"Fragments et traductions du lecteur en mémoire. Le cache disque est ignoré ; Effacer le cache le supprime. Originaux et préférences conservés."},
-    es:{manualReaderHint:"Pulsa Translate / Original bajo una respuesta completa. Windows requiere Open Codex with TwinText.cmd; Linux usa pegado manual. Los cambios de Codex pueden afectar los botones.",sessionCache:"Recordar traducciones solo hasta cerrar TwinText",sessionCacheHint:"Fragmentos y traducciones del lector solo en memoria. Se ignora la caché en disco; Borrar caché la elimina. Se conservan originales y ajustes."}
+    en:{manualReaderHint:"Click Translate / Original on a completed Codex reply. Start with Open Codex with TwinText.cmd on Windows or Codex with TwinText on Linux. Codex UI changes may affect buttons.",sessionCache:"Only remember translations until TwinText exits",sessionCacheHint:"Fragments and reader translations stay in memory. Existing disk cache is ignored; Clear cache removes it. Originals and settings are kept."},
+    zh:{manualReaderHint:"点击 Codex 已完成回复下的 Translate / Original。Windows 需使用 Open Codex with TwinText.cmd；Linux 使用 Codex with TwinText。Codex 界面变更可能影响按钮。",sessionCache:"仅本次运行缓存译文（退出后释放）",sessionCacheHint:"翻译片段和阅读器译文仅存于内存，忽略旧磁盘缓存。点击“清除缓存”可清除旧译文，保留原文和设置。"},
+    ja:{manualReaderHint:"完了した返信の Translate / Original をクリック。Windows は Open Codex with TwinText.cmd、Linux は Codex with TwinText を使用します。Codex の UI 変更でボタンに影響する場合があります。",sessionCache:"TwinText 終了まで訳文を記憶",sessionCacheHint:"断片とリーダー訳文はメモリ内のみ。既存のディスクキャッシュは無視し、キャッシュ消去で削除。原文と設定は保持します。"},
+    fr:{manualReaderHint:"Cliquez sur Translate / Original sous une réponse terminée. Windows nécessite Open Codex with TwinText.cmd ; Linux utilise Codex with TwinText. Les changements de Codex peuvent affecter les boutons.",sessionCache:"Garder les traductions jusqu’à la fermeture de TwinText",sessionCacheHint:"Fragments et traductions du lecteur en mémoire. Le cache disque est ignoré ; Effacer le cache le supprime. Originaux et préférences conservés."},
+    es:{manualReaderHint:"Pulsa Translate / Original bajo una respuesta completa. Windows requiere Open Codex with TwinText.cmd; Linux usa Codex with TwinText. Los cambios de Codex pueden afectar los botones.",sessionCache:"Recordar traducciones solo hasta cerrar TwinText",sessionCacheHint:"Fragmentos y traducciones del lector solo en memoria. Se ignora la caché en disco; Borrar caché la elimina. Se conservan originales y ajustes."}
   };
   for (const [code, words] of Object.entries(messageWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
@@ -191,7 +191,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.10.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.11.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }

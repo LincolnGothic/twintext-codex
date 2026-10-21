@@ -68,7 +68,10 @@ is separate. Window exit releases session caches and cancels pending translation
 
 One source-installer ZIP per OS contains the same manual reader. Installation keeps
 models and unrelated preferences while persisting profile migration. Message buttons
-currently require Windows; Linux retains manual Paste and graphical Qt dependencies.
+use the dedicated Windows or native Linux launcher and the same loopback adapter.
+Linux discovers the desktop executable beside resources/app.asar, checks this user's
+GUI process paths, and starts a detached app only after a normal exit. The installed
+menu launcher pins the settings/data paths. Manual Paste remains available on both OSes.
 Regular GitHub releases publish only after Windows/Linux regressions and fresh ZIP
 installation, real Offline table translation, hooks, Qt and upgrade checks pass.
 Unit tests use controlled adapter/DOM/protocol fixtures and never certify all private

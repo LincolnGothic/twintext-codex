@@ -1,6 +1,6 @@
 # TwinText troubleshooting
 
-TwinText 0.10.0 uses only per-reply Translate / Original and a separate reader.
+TwinText 0.11.0 uses only per-reply Translate / Original and a separate reader.
 Manual Paste remains the fallback. Inline and automatic Desktop modes are retired.
 
 ## Text stays in its original language
@@ -26,16 +26,17 @@ no longer switches integration methods.
 1. Check **Enable Translate buttons** in settings. A disabled integration does not
    show message buttons. Keep the TwinText reader running, even when collapsed.
 2. If Codex was already opened through the dedicated launcher, reopen TwinText with
-   **Open TwinText.cmd**. Its adapter retries the existing local connection.
-3. Otherwise use **Open Codex with TwinText.cmd** as below. A normally launched
+   **Open TwinText.cmd** or `twintext desktop` on Linux. Its adapter retries the connection.
+3. Otherwise use **Open Codex with TwinText.cmd** on Windows, or **Codex with TwinText**
+   from the Linux applications menu (`twintext codex-launch --wait`). A normally launched
    Codex instance does not automatically have its debugging connection.
 4. Open a completed assistant reply. Unsupported layouts, hidden reasoning, tool
    results and question cards receive no button. Do not translate another reply
    as a substitute. Use the reader's manual Paste fallback.
 
-The Windows adapter is experimental and depends on private Codex renderer details.
+The Windows/Linux adapter is experimental and depends on private Codex renderer details.
 Keep one main Codex window open. A host update can require an adapter update.
-Linux currently uses manual Paste rather than these message buttons.
+Manual Paste remains available on both platforms.
 
 ## The Codex launcher stops at "Press any key"
 
@@ -55,8 +56,10 @@ ChatGPT app normally, including tray/background instances. The launcher continue
 only after a normal exit. Ctrl+C cancels; TwinText never kills a conversation.
 Closing a single chat window may leave the shared app running.
 
-The launcher selects the installed shared ChatGPT.exe, falling back to legacy
-Codex.exe. It waits up to 20 seconds for debugging on 127.0.0.1:9223 before starting
+The Windows launcher selects the installed shared ChatGPT.exe, falling back to legacy
+Codex.exe. Linux selects the native desktop executable beside `resources/app.asar`,
+including `/usr/lib/chatgpt/ChatGPT`. It never selects the unrelated Codex CLI.
+Both wait up to 20 seconds for debugging on 127.0.0.1:9223 before starting
 the reader. Port conflicts, early exit or host rejection produce errors. Do not
 forward the port to a network or add broad remote-origin flags. Proxy settings are
 bypassed for this loopback connection. No Codex files are patched. Native startup
@@ -72,6 +75,8 @@ The compact button toggles the reader; drag **T** deliberately to move it. **−
 **×** on either window quits TwinText. Follow/always-on-top depend on the window
 manager. Follow supports Windows and X11/XWayland; native Wayland may require
 manual positioning. When inactive/minimized, an attached window can be hidden.
+Turn off **Follow Codex window** to keep the reader stationary while moving Codex;
+message buttons continue working independently of window following.
 
 Paste reads the clipboard only on click. Edit and press Translate. Copy original
 always copies source Markdown, including when bilingual or translated text is shown.

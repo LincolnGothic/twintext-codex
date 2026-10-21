@@ -34,7 +34,7 @@
           <label class="check"><input type="checkbox" id="cache" checked><span data-i18n="cache">Remember translations locally</span></label>
           <label class="check"><input type="checkbox" id="session-cache"><span data-i18n="sessionCache">Only remember translations until TwinText exits</span></label>
           <p class="hint" data-i18n="sessionCacheHint">Session caching covers fragments and reader translations. Existing disk cache is ignored; Clear cache removes it. Originals and settings are kept.</p>
-          <p class="hint" id="manual-reader-hint" data-i18n="manualReaderHint">Click Translate / Original on a completed Codex reply. Windows requires Open Codex with TwinText.cmd; Linux uses manual Paste. Codex UI changes may affect buttons.</p>
+          <p class="hint" id="manual-reader-hint" data-i18n="manualReaderHint">Click Translate / Original on a completed Codex reply. Start with Open Codex with TwinText.cmd on Windows or Codex with TwinText on Linux. Codex UI changes may affect buttons.</p>
           <button type="submit" class="primary" id="save" data-i18n="save">Save preferences</button>
           <p class="hint" data-i18n="nextReply">Preferences apply to new replies in chats with TwinText enabled.</p>
         </form>
@@ -69,7 +69,7 @@
         <button id="clear-cache" class="text-button" type="button" data-i18n="clearCache">Clear remembered translations</button>
       </div>
     </div>
-    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.10.0 · MIT</span></footer>
+    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.11.0 · MIT</span></footer>
   </main>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <script nonce="{{TOKEN}}">window.TWINTEXT_BOOT = {token: "{{TOKEN}}", embedded: {{EMBEDDED}}};

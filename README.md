@@ -10,13 +10,13 @@ host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 Google Free (experimental) is an optional keyless online provider. Offline remains the default.
 
-[Download 0.10.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.10.0) ·
+[Download 0.11.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.11.0) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
 ## One method: click a reply, read separately
 
-TwinText 0.10.0 keeps **per-reply Translate / Original → a separate reader**.
+TwinText 0.11.0 keeps **per-reply Translate / Original → a separate reader**.
 Inline-chat translation and automatic Desktop capture have been removed. Scrolling,
 new replies and changing settings never start a translation. Original Codex messages
 and their native Copy action stay unchanged.
@@ -28,7 +28,7 @@ and their native Copy action stay unchanged.
 - Choose **Bilingual**, **Translation only** or **Original** for the reader's view.
   These are reading preferences, not different integration methods.
 - **Paste text** is the manual fallback: paste, edit, then click **Translate**.
-  Linux currently uses this fallback; per-reply buttons require the Windows launcher.
+  Per-reply buttons require the dedicated TwinText launcher on either platform.
 - All providers, languages, model packages and cache controls remain available.
   Valid older profiles migrate to this method while retaining unrelated preferences.
   Saved originals are preserved, including the old Desktop inbox's retained replies.
@@ -66,14 +66,34 @@ No Codex application files are patched. Exit and launch Codex normally to stop d
 Runtime logs are in `desktop/launcher.log`; generated CMD files pin the installed
 settings/data paths. See [launcher troubleshooting](docs/troubleshooting.md#the-codex-launcher-stops-at-press-any-key).
 
+### Start the Linux message buttons
+
+1. Keep **Enable Translate buttons** enabled in TwinText settings. The installer
+   creates an application-menu entry named **Codex with TwinText**.
+2. Open that entry, or run `twintext codex-launch --wait` in a terminal. If it says
+   **Waiting**, leave the terminal open and quit Codex and its shared ChatGPT app
+   normally. The launcher continues after exit; **Ctrl+C** cancels waiting.
+3. Open a completed assistant reply and click **Translate / Original**. Keep the
+   separate reader running. Scrolling, new messages and settings never translate.
+
+To keep the reader where you place it, turn off **Follow Codex window** in settings.
+This preference is independent of the message buttons and survives upgrades.
+
+Linux discovers the native desktop executable beside `resources/app.asar`, including
+the shared `/usr/lib/chatgpt/ChatGPT` package. The unrelated `codex` command-line tool
+is never launched. For another native installation set `TWINTEXT_CODEX_EXECUTABLE`
+to its actual `ChatGPT`/`Codex` executable. AppImage, Snap and Flatpak packages have
+not been validated. The launcher checks this user's GUI processes, waits for normal
+exit, and uses only `127.0.0.1:9223`, with the same message adapter as Windows.
+
 ## Download
 
 One package per operating system, containing the same manual reader:
 
 | Operating system | Download | Checksums |
 | --- | --- | --- |
-| Windows | [Windows ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.10.0/TwinText-0.10.0-windows.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.10.0/SHA256SUMS-windows.txt) |
-| Linux | [Linux ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.10.0/TwinText-0.10.0-linux.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.10.0/SHA256SUMS-linux.txt) |
+| Windows | [Windows ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.11.0/TwinText-0.11.0-windows.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.11.0/SHA256SUMS-windows.txt) |
+| Linux | [Linux ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.11.0/TwinText-0.11.0-linux.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.11.0/SHA256SUMS-linux.txt) |
 
 Check SHA-256 against the checksum file. These are source/installer archives;
 Python, dependencies and models are separate downloads. Windows packages are unsigned.
@@ -113,9 +133,9 @@ bash scripts/install-linux.sh
 ```
 
 Use `TWINTEXT_PYTHON=/usr/bin/python3.12` if needed. The installer creates a private
-runtime, an application-menu entry and `~/.local/bin/twintext`. Run `twintext desktop`
-or open the reader from settings. Use **Paste text**, then **Translate**. The Windows
-message-button launcher is not supported on Linux. Ubuntu/Debian may require:
+runtime, reader and **Codex with TwinText** application-menu entries, and
+`~/.local/bin/twintext`. Use the Codex launcher for message buttons, or run
+`twintext desktop` for the manual **Paste text → Translate** fallback. Ubuntu/Debian may require:
 
 ```bash
 sudo apt install libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0
@@ -309,7 +329,7 @@ selection, cancellation, mutation/recycling and original-text preservation. Thes
 do not certify every native Codex version or compositor behavior.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.10.0.md). Report OS/Python/Codex/TwinText versions,
+and [release notes](docs/release-0.11.0.md). Report OS/Python/Codex/TwinText versions,
 language pair, and a sanitized example; do not post private chats or databases.
 
 ## Remove TwinText

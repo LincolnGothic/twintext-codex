@@ -403,43 +403,44 @@ for _language, _labels in {
 for _language, _labels in {
     "en": ("Per-reply Translate buttons (experimental, manual only)",
            "Only remember translations until TwinText exits",
-           'Click Translate / Original on a completed Codex reply. Windows requires Open '
-           'Codex with TwinText.cmd; Linux uses manual Paste. Codex UI changes may affect '
-           'buttons.',
-           "Waiting for Codex. Exit Codex, then use Open Codex with TwinText.cmd.",
+           'Click Translate / Original on a completed Codex reply. Start with Open '
+           'Codex with TwinText.cmd on Windows or Codex with TwinText on Linux. '
+           'Codex UI changes may affect buttons.',
+           "Waiting for Codex. Exit Codex, then use its TwinText launcher.",
            "Connected. Open a completed reply; unsupported layouts show no button.",
            "Session cache covers fragments and reader translations. Existing disk cache "
            "is ignored; Clear cache removes it. Originals and settings are kept."),
     "zh": ("逐条回复翻译按钮（实验性，仅手动翻译）", "仅本次运行缓存译文（退出后释放）",
            '点击 Codex 已完成回复下的 Translate / Original。Windows 需使用 Open Codex with '
-           'TwinText.cmd；Linux 可手动粘贴。Codex 界面变更可能影响按钮。',
-           "等待连接。退出 Codex 后，运行 Open Codex with TwinText.cmd。",
+           'TwinText.cmd；Linux 使用 Codex with TwinText。Codex 界面变更可能影响按钮。',
+           "等待连接。退出 Codex 后，使用 TwinText 专用启动器。",
            "已连接。请打开已完成的回复；不兼容的消息布局不会显示按钮。",
            "仅在内存中保存翻译片段和阅读器译文，忽略旧磁盘缓存。"
            "点击“清除缓存”可清除旧译文，保留原文和设置。"),
     "ja": ("返信ごとの翻訳ボタン（試験的・手動のみ）", "TwinText 終了まで訳文を記憶",
            '完了した返信の Translate / Original をクリック。'
            'Windows は Open Codex with TwinText.cmd、Linux '
-           'は手動貼り付けを使用します。Codex の UI 変更でボタンに影響する場合があります。',
-           "接続待ち。Codex を終了し Open Codex with TwinText.cmd を実行してください。",
+           'は Codex with TwinText を使用します。'
+           'Codex の UI 変更でボタンに影響する場合があります。',
+           "接続待ち。Codex を終了し TwinText 専用ランチャーを実行してください。",
            "接続済み。完了した返信を開いてください。非対応の表示にはボタンは出ません。",
            "断片とリーダーの訳文をメモリ内だけに保存。既存のディスクキャッシュは無視し、"
            "キャッシュ消去で削除します。原文と設定は保持します。"),
     "fr": ("Boutons Traduire par réponse (expérimental, manuel)",
            "Garder les traductions jusqu’à la fermeture de TwinText",
            'Cliquez sur Translate / Original sous une réponse terminée. Windows nécessite '
-           'Open Codex with TwinText.cmd ; Linux utilise le collage manuel. Les changements '
+           'Open Codex with TwinText.cmd ; Linux utilise Codex with TwinText. Les changements '
            'de Codex peuvent affecter les boutons.',
-           "En attente. Fermez Codex et lancez Open Codex with TwinText.cmd.",
+           "En attente. Fermez Codex et utilisez son lanceur TwinText.",
            "Connecté. Ouvrez une réponse terminée ; les vues non compatibles n’ont pas de bouton.",
            "Fragments et traductions du lecteur en mémoire seulement. Le cache disque est ignoré ; "
            "Effacer le cache le supprime. Originaux et préférences conservés."),
     "es": ("Botones Traducir por respuesta (experimental, manual)",
            "Recordar traducciones solo hasta cerrar TwinText",
            'Pulsa Translate / Original bajo una respuesta completa. Windows requiere Open '
-           'Codex with TwinText.cmd; Linux usa pegado manual. Los cambios de Codex pueden '
+           'Codex with TwinText.cmd; Linux usa Codex with TwinText. Los cambios de Codex pueden '
            'afectar los botones.',
-           "Esperando. Cierra Codex y ejecuta Open Codex with TwinText.cmd.",
+           "Esperando. Cierra Codex y usa su lanzador TwinText.",
            "Conectado. Abre una respuesta completa; las vistas incompatibles no muestran botones.",
            "Fragmentos y traducciones del lector solo en memoria. Se ignora la caché en disco; "
            "Borrar caché la elimina. Se conservan originales y ajustes."),

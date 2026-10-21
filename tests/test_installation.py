@@ -67,6 +67,43 @@ class InstallationTests(unittest.TestCase):
             b"",
         ])
 
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux shell launcher")
+    def test_linux_menu_launcher_pins_paths_and_passes_wait_without_shell_expansion(self):
+        app = self.home / "TwinText $test %value% 'quoted'"
+        scripts = app / "venv/bin"
+        scripts.mkdir(parents=True)
+        probe = scripts / "python"
+        probe.write_text(
+            f"#!{sys.executable}\n"
+            "import json, os, sys\n"
+            "print(json.dumps([sys.argv[1:], os.environ.get('TWINTEXT_HOME'), "
+            "os.environ['TWINTEXT_CONFIG_DIR'], os.environ['TWINTEXT_DATA_DIR']]))\n",
+            encoding="utf-8",
+        )
+        probe.chmod(0o700)
+        settings = self.home / "settings $test 'quoted'"
+        data = self.home / "data %value%"
+        install = runpy.run_path(str(ROOT / "scripts/register-desktop.py"))
+        with (patch.dict(os.environ, XDG_DATA_HOME=str(self.home / "xdg")),
+              patch.dict(install["register"].__globals__,
+                         config_dir=lambda: settings, data_dir=lambda: data),
+              contextlib.redirect_stdout(io.StringIO())):
+            install["register"](app)
+        launcher = app / "Open Codex with TwinText.sh"
+        result = subprocess.run(
+            [str(launcher)], check=True, capture_output=True, text=True, timeout=10,
+            env=dict(os.environ, TWINTEXT_HOME="wrong", TWINTEXT_CONFIG_DIR="wrong",
+                     TWINTEXT_DATA_DIR="wrong"),
+        )
+        self.assertEqual(json.loads(result.stdout), [
+            ["-m", "twintext.cli", "codex-launch", "--wait"], None,
+            str(settings), str(data),
+        ])
+        entry = (self.home / "xdg/applications/twintext-codex.desktop").read_text()
+        self.assertIn("Name=Codex with TwinText\n", entry)
+        self.assertIn("Terminal=true\n", entry)
+        self.assertIn("%%value%%", entry)
+
     @unittest.skipUnless(sys.platform == "win32", "Windows command interpreter")
     def test_windows_launcher_preserves_percent_and_bang_in_settings_paths(self):
         app = self.home / "TwinText %test% !TASK_LAUNCHER_PROFILE!"
