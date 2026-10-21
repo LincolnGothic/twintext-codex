@@ -59,6 +59,14 @@
     es:{followCodex:"Seguir la ventana de Codex",followCodexHint:"Windows y X11/XWayland. El botón sigue a Codex; haga clic para mostrar u ocultar la traducción. Wayland nativo requiere colocación manual."}
   };
   for (const [code, words] of Object.entries(followWords)) Object.assign(translations[code], words);
+  const messageWords = {
+    en:{messageButtons:"Per-reply Translate buttons (experimental, manual only)",messageButtonsHint:"Requires the floating reader and Open Codex with TwinText.cmd on Windows. Disables automatic translation. Private Codex UI changes may break buttons.",sessionCache:"Only remember translations until TwinText exits",sessionCacheHint:"Fragments and reader translations stay in memory. Existing disk cache is ignored; Clear cache removes it. Originals and settings are kept."},
+    zh:{messageButtons:"逐条回复翻译按钮（实验性，仅手动翻译）",messageButtonsHint:"需选择 Codex 旁浮动阅读器，并使用 Windows 专用启动器 Open Codex with TwinText.cmd。启用后关闭自动翻译。Codex 内部界面变更可能导致按钮失效。",sessionCache:"仅本次运行缓存译文（退出后释放）",sessionCacheHint:"翻译片段和阅读器译文仅存于内存，忽略旧磁盘缓存。点击“清除缓存”可清除旧译文，保留原文和设置。"},
+    ja:{messageButtons:"返信ごとの翻訳ボタン（試験的・手動のみ）",messageButtonsHint:"リーダーと Windows 専用の Open Codex with TwinText.cmd が必要です。自動翻訳を停止します。内部 UI 変更により動作しなくなる場合があります。",sessionCache:"TwinText 終了まで訳文を記憶",sessionCacheHint:"断片とリーダー訳文はメモリ内のみ。既存のディスクキャッシュは無視し、キャッシュ消去で削除。原文と設定は保持します。"},
+    fr:{messageButtons:"Boutons Traduire par réponse (expérimental, manuel)",messageButtonsHint:"Lecteur et lanceur Windows Open Codex with TwinText.cmd requis. Désactive la traduction automatique. Les changements internes de Codex peuvent casser les boutons.",sessionCache:"Garder les traductions jusqu’à la fermeture de TwinText",sessionCacheHint:"Fragments et traductions du lecteur en mémoire. Le cache disque est ignoré ; Effacer le cache le supprime. Originaux et préférences conservés."},
+    es:{messageButtons:"Botones Traducir por respuesta (experimental, manual)",messageButtonsHint:"Requiere el lector y el lanzador Windows Open Codex with TwinText.cmd. Desactiva la traducción automática. Los cambios internos de Codex pueden romper los botones.",sessionCache:"Recordar traducciones solo hasta cerrar TwinText",sessionCacheHint:"Fragmentos y traducciones del lector solo en memoria. Se ignora la caché en disco; Borrar caché la elimina. Se conservan originales y ajustes."}
+  };
+  for (const [code, words] of Object.entries(messageWords)) Object.assign(translations[code], words);
   let locale = "en", hostLocale = navigator.language, lastResult = null, lastStatus = null;
   let translationBusy = false, modelsBusy = false;
   let bridgeId = 0;
@@ -138,8 +146,13 @@
   }
   function chatControls() {
     const desktop = $("location").value === "desktop";
-    $("response-scope").disabled = desktop;
-    $("translate-questions").disabled = desktop;
+    const floating = $("location").value === "chat-floating";
+    const manual = floating && $("message-buttons").checked;
+    $("message-buttons").disabled = !floating;
+    $("session-cache").disabled = !$("cache").checked;
+    $("message-buttons-hint").hidden = !manual;
+    $("response-scope").disabled = desktop || manual;
+    $("translate-questions").disabled = desktop || manual;
     $("follow-codex").disabled = $("location").value === "chat-inline";
   }
   function showModels(status) {
@@ -188,13 +201,15 @@
   });
   $("ui-language").addEventListener("change", localize);
   $("location").addEventListener("change", chatControls);
+  $("message-buttons").addEventListener("change", chatControls);
+  $("cache").addEventListener("change", chatControls);
   $("provider").addEventListener("change", () => { localize(); });
   document.querySelectorAll("input[name=mode]").forEach(input => input.addEventListener("change", renderResult));
   $("settings-form").addEventListener("submit", async event => {
     event.preventDefault(); $("save").disabled = true;
     try {
       const location = $("location").value;
-      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:location === "desktop" ? "desktop" : "chat",chat_presentation:location === "desktop" ? lastStatus.settings.chat_presentation || "inline" : location.slice(5),response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,follow_codex:$("follow-codex").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked});
+      lastStatus = await tool("twintext_set_settings", {provider:$("provider").value,workflow:location === "desktop" ? "desktop" : "chat",chat_presentation:location === "desktop" ? lastStatus.settings.chat_presentation || "inline" : location.slice(5),response_scope:$("response-scope").value,translate_questions:$("translate-questions").checked,follow_codex:$("follow-codex").checked,target:$("target").value,source:$("source").value,mode:mode(),ui_language:$("ui-language").value,enabled:$("enabled").checked,cache:$("cache").checked,cache_lifetime:$("session-cache").checked ? "session" : "disk",message_buttons:$("message-buttons").checked});
       localize(); notify(t("saved"));
     } catch (error) { notify(error.message, true); } finally { $("save").disabled = false; }
   });
@@ -225,7 +240,7 @@
     localize();
     try {
       if (boot.embedded) {
-        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.8.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
+        const initialization = await request("ui/initialize", {appInfo:{name:"TwinText",version:"0.9.0"},appCapabilities:{},protocolVersion:"2026-01-26"});
         hostLocale = initialization.hostContext?.locale || hostLocale;
         window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized"}, "*");
       }
@@ -243,6 +258,8 @@
       $("target").value = settings.target; $("source").value = settings.source; $("ui-language").value = settings.ui_language;
       document.querySelector(`input[name=mode][value=${settings.mode}]`).checked = true;
       $("enabled").checked = settings.enabled; $("cache").checked = settings.cache;
+      $("session-cache").checked = settings.cache_lifetime === "session";
+      $("message-buttons").checked = settings.message_buttons ?? false;
       localize();
     } catch (error) { notify(error.message, true); }
   }

@@ -43,6 +43,8 @@ for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_p
   assert.equal(element("response-scope").value, saved.response_scope || "final");
   assert.equal(element("location").value, saved.workflow === "desktop" ? "desktop" : saved.chat_presentation === "floating" ? "chat-floating" : "chat-inline");
   assert.equal(element("translate-questions").checked, saved.translate_questions ?? true);
+  assert.equal(element("message-buttons").checked, false);
+  assert.equal(element("session-cache").checked, false);
   assert.equal(element("follow-codex").checked, saved.follow_codex ?? false);
   assert.equal(element("follow-codex").disabled, !saved.chat_presentation);
   assert.equal(element("response-scope").disabled, saved.workflow === "desktop");
@@ -59,6 +61,10 @@ for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_p
   element("response-scope").value = "all";
   element("translate-questions").checked = false;
   element("follow-codex").checked = true;
+  element("message-buttons").checked = true;
+  element("message-buttons").listeners.change();
+  element("session-cache").checked = true;
+  assert.equal(element("response-scope").disabled, true);
   for (const language of ["en", "zh", "ja", "fr", "es"]) {
     element("ui-language").value = language;
     element("ui-language").listeners.change();
@@ -76,5 +82,7 @@ for (const saved of [{}, {response_scope:"all", translate_questions:false,chat_p
   assert.equal(settingsCall.arguments.chat_presentation, "floating");
   assert.equal(settingsCall.arguments.translate_questions, false);
   assert.equal(settingsCall.arguments.follow_codex, true);
+  assert.equal(settingsCall.arguments.message_buttons, true);
+  assert.equal(settingsCall.arguments.cache_lifetime, "session");
 }
 console.log("Chat settings defaults, saved values, localization and workflow controls passed.");

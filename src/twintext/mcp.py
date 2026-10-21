@@ -6,8 +6,8 @@ import sys
 import threading
 
 from twintext import __version__
-from twintext.cache import Cache
 from twintext.config import (
+    CACHE_LIFETIMES,
     CHAT_PRESENTATIONS,
     LANGUAGES,
     MODES,
@@ -90,6 +90,8 @@ def tools():
                 "ui_language": {"type": "string", "enum": ["auto", *LANGUAGES]},
                 "enabled": {"type": "boolean"},
                 "cache": {"type": "boolean"},
+                "cache_lifetime": {"type": "string", "enum": list(CACHE_LIFETIMES)},
+                "message_buttons": {"type": "boolean"},
                 "host_locale": {"type": "string", "enum": ["auto", *LANGUAGES]},
                 "desktop_auto_start": {"type": "boolean"},
                 "always_on_top": {"type": "boolean"},
@@ -159,7 +161,9 @@ def call_tool(name, arguments, service, cancel=None):
         update_settings(**arguments)
         return service.status()
     if name == "twintext_clear_cache":
-        Cache().clear()
+        from twintext.bridge import Inbox
+
+        Inbox().clear_translations()
         return {"cleared": True}
     if name == "twintext_install_models":
         if service.status()["provider"] != "offline":

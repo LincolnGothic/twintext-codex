@@ -80,7 +80,8 @@ class Service:
             settings.provider + ":" + engine.fingerprint(source, settings.target)
             if needs_translation else ""
         )
-        cache = Cache() if settings.cache and needs_translation else None
+        cache = (Cache(memory=settings.cache_lifetime == "session")
+                 if settings.cache and needs_translation else None)
 
         def translate_fragment(fragment):
             nonlocal cache_hits
@@ -181,6 +182,14 @@ def context(session_id=None, turn_id=None):
     settings = load_settings()
     if settings.workflow != "chat":
         return ""
+    if settings.manual_reader:
+        return (
+            "TwinText uses manual per-message translation buttons and a separate reader. "
+            "Keep assistant messages in their original language. Do not call TwinText "
+            "translation or forwarding tools for ordinary replies, progress or questions. "
+            "The user clicks a message button to translate it outside model context. "
+            "Explicit translation requests take precedence."
+        )
     if not settings.enabled or settings.mode == "original":
         return (
             "TwinText Chat translation is paused. Stop applying earlier TwinText translation "

@@ -30,7 +30,134 @@ class PendingTranslator:
         self.jobs.append(job)
 
 
+class PendingAdapter:
+    def __init__(self, language):
+        self.language = language
+        self.events = queue.Queue()
+        self.feedbacks = []
+        self.status = "buttons_connected"
+
+    def feedback(self, request, state):
+        self.feedbacks.append((request, state))
+
+    def close(self):
+        pass
+
+
 class DesktopTests(unittest.TestCase):
+    def test_message_buttons_translate_only_clicked_reply_and_toggle_original(self):
+        with patch("twintext.desktop.MessageAdapter", PendingAdapter):
+            update_settings(workflow="chat", chat_presentation="floating", message_buttons=True,
+                            cache_lifetime="session")
+            self.inbox.publish(payload(text="Previously captured answer"), archive=True)
+            self.window.poll()
+            self.assertEqual(self.worker.jobs, [])
+            adapter = self.window.message_adapter
+            old = {"document": "doc", "request": 1, "action": "translate", "session": "thread",
+                   "message": "old-message", "text": "Exact old English reply"}
+            adapter.events.put(old)
+            self.window.poll()
+            self.assertEqual(self.worker.jobs[-1][1], "Exact old English reply")
+            self.deliver_result()
+            self.assertIn("译:", self.window.reader.toPlainText())
+            self.assertEqual(adapter.feedbacks[-1][1], "ready")
+            jobs = len(self.worker.jobs)
+            adapter.events.put({**old, "request": 2, "action": "original"})
+            self.window.poll()
+            self.assertEqual(len(self.worker.jobs), jobs)
+            self.assertEqual(self.window.reader.toPlainText(), "Exact old English reply")
+            adapter.events.put({**old, "request": 3})
+            self.window.poll()
+            self.assertEqual(len(self.worker.jobs), jobs, "Repeat clicks reuse a completed result")
+            self.window.copy()
+            self.assertEqual(self.app.clipboard().text(), "Exact old English reply")
+            self.inbox.publish(payload(text="New automatic reply"), archive=True)
+            self.window.poll()
+            self.assertEqual(self.window.text, old["text"], "New replies must not steal selection")
+
+    def test_message_navigation_cancels_pending_work_and_ignores_old_completion(self):
+        with patch("twintext.desktop.MessageAdapter", PendingAdapter):
+            update_settings(workflow="chat", chat_presentation="floating", message_buttons=True)
+            self.window.poll()
+            adapter = self.window.message_adapter
+            old = {"document": "doc", "request": 1, "action": "translate", "session": "thread",
+                   "message": "old", "text": "Old source"}
+            adapter.events.put(old)
+            self.window.poll()
+            revision = self.worker.jobs[-1][0]
+            adapter.events.put({"action": "reset"})
+            self.window.poll()
+            self.worker.results.put((revision, {"display": "Stale translation"}, None))
+            self.window.poll()
+            self.assertIsNone(self.window.last_result)
+            self.assertEqual(self.window.reader.toPlainText(), "Old source")
+            self.assertNotEqual(self.window.status_key, "working")
+
+    def test_disabling_manual_translation_cancels_inflight_message(self):
+        with patch("twintext.desktop.MessageAdapter", PendingAdapter):
+            update_settings(workflow="chat", chat_presentation="floating", message_buttons=True)
+            self.window.poll()
+            self.window.message_adapter.events.put({"document": "doc", "request": 1,
+                "action": "translate", "session": "thread", "message": "old", "text": "Old source"})
+            self.window.poll()
+            revision = self.window.revision
+            update_settings(enabled=False)
+            self.window.poll()
+            self.assertGreater(self.window.revision, revision)
+            self.assertFalse(self.window.show_translation)
+            self.assertNotEqual(self.window.status_key, "working")
+
+    def test_existing_message_click_keeps_dropdown_and_pending_request_in_sync(self):
+        with patch("twintext.desktop.MessageAdapter", PendingAdapter):
+            update_settings(workflow="chat", chat_presentation="floating", message_buttons=True)
+            self.window.poll()
+            adapter = self.window.message_adapter
+            for index, name in enumerate(("A", "B", "A"), 1):
+                adapter.events.put({"document": "doc", "request": index, "action": "translate",
+                                    "session": "thread", "message": name, "text": name + " reply"})
+                self.window.poll()
+                self.assertEqual(self.window.sessions.currentData(), self.window.reply_id)
+                self.assertIsNotNone(self.window.message_request)
+                self.assertTrue(self.window.show_translation)
+            self.window.sessions.setCurrentIndex(0)
+            self.assertEqual(self.window.text, "B reply")
+
+    def test_manual_mode_preferences_and_expansion_do_not_trigger_inference(self):
+        with patch("twintext.desktop.MessageAdapter", PendingAdapter):
+            update_settings(workflow="chat", chat_presentation="floating", message_buttons=True,
+                            mode="original")
+            self.inbox.publish(payload(), archive=True)
+            self.window.poll()
+            self.window.select_reply(0)
+            update_settings(mode="translated")
+            self.window.poll()
+            self.window.expand()
+            self.assertEqual(self.worker.jobs, [])
+
+    def test_navigation_drain_racing_with_reader_poll_does_not_raise(self):
+        with patch("twintext.desktop.MessageAdapter", PendingAdapter):
+            update_settings(workflow="chat", chat_presentation="floating", message_buttons=True)
+            self.window.poll()
+            adapter = self.window.message_adapter
+            with patch.object(adapter.events, "empty", return_value=False):
+                self.window.poll()  # The producer can drain a previously nonempty queue.
+
+    def test_session_cache_and_button_settings_are_localized_and_saved(self):
+        update_settings(workflow="chat", chat_presentation="floating")
+        self.window.poll()
+        with patch("twintext.desktop.MessageAdapter", PendingAdapter):
+            self.window.checks["message_buttons"].click()
+            self.window.checks["session_cache"].click()
+            self.assertTrue(load_settings().message_buttons)
+            self.assertEqual(load_settings().cache_lifetime, "session")
+            for language in LANGUAGES:
+                self.window.settings = update_settings(ui_language=language)
+                self.window.localize()
+                self.assertTrue(self.window.checks["message_buttons"].text())
+                self.assertTrue(self.window.checks["session_cache"].text())
+                self.assertTrue(self.window.checks["message_buttons"].isChecked())
+                self.assertTrue(self.window.checks["session_cache"].isChecked())
+
     def test_google_provider_is_localized_and_failure_keeps_original(self):
         self.window.settings = update_settings(provider="google-free", target="zh-TW")
         self.window.localize()

@@ -36,6 +36,10 @@
           <p class="hint" data-i18n="followHint">Automatic follows Codex's language in an embedded panel, or your browser's language here.</p>
           <label class="check"><input type="checkbox" id="enabled" checked><span data-i18n="enabled">Translate new Codex replies</span></label>
           <label class="check"><input type="checkbox" id="cache" checked><span data-i18n="cache">Remember translations locally</span></label>
+          <label class="check"><input type="checkbox" id="session-cache"><span data-i18n="sessionCache">Only remember translations until TwinText exits</span></label>
+          <p class="hint" data-i18n="sessionCacheHint">Session caching covers fragments and reader translations. Existing disk cache is ignored; Clear cache removes it. Originals and settings are kept.</p>
+          <label class="check"><input type="checkbox" id="message-buttons"><span data-i18n="messageButtons">Per-reply Translate buttons (experimental, manual only)</span></label>
+          <p class="hint" id="message-buttons-hint" data-i18n="messageButtonsHint">Requires the floating reader and special Windows Codex launcher. Disables automatic translation. Private Codex UI changes may break buttons.</p>
           <button type="submit" class="primary" id="save" data-i18n="save">Save preferences</button>
           <p class="hint" data-i18n="nextReply">Preferences apply to new replies in chats with TwinText enabled.</p>
         </form>
@@ -70,7 +74,7 @@
         <button id="clear-cache" class="text-button" type="button" data-i18n="clearCache">Clear remembered translations</button>
       </div>
     </div>
-    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.8.0 · MIT</span></footer>
+    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.9.0 · MIT</span></footer>
   </main>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <script nonce="{{TOKEN}}">window.TWINTEXT_BOOT = {token: "{{TOKEN}}", embedded: {{EMBEDDED}}};

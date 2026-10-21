@@ -11,4 +11,5 @@ dist/
 *.argosmodel
 *.log
 .env
+node_modules/
 

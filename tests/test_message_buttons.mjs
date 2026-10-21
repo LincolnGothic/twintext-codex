@@ -1,0 +1,144 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {JSDOM} from "jsdom";
+
+// The current Windows renderer supplies item/conversationId on the assistant
+// component and marks its rendered text with this attribute. No app is driven.
+const script = readFileSync(new URL("../src/twintext/web/message-buttons.js", import.meta.url), "utf8");
+const dom = new JSDOM("<!doctype html><html lang='en'><body></body></html>", {runScripts:"outside-only", url:"https://fixture.invalid/"});
+const {window} = dom;
+const {document} = window;
+const deliveries = [];
+window.fixtureBinding = raw => deliveries.push(JSON.parse(raw));
+window.TWINTEXT_MESSAGE_CONFIG = {binding:"fixtureBinding", document:"fixture-document", language:"zh"};
+let clipboardCalls = 0;
+Object.defineProperty(window.navigator, "clipboard", {value:{writeText() {clipboardCalls++;}}});
+const mount = (id, content, overrides = {}) => {
+  const root = document.createElement("section");
+  const body = document.createElement("div");
+  body.setAttribute("data-selected-text-overlay-target", "");
+  body.textContent = content;
+  root.append(body);
+  const props = {conversationId:"thread-1", turnId:"turn-1", item:{type:"assistant-message", completed:true, searchItemId:id, content, ...overrides}};
+  const fiberRoot = {return:null, stateNode:{}};
+  fiberRoot.stateNode.current = fiberRoot;
+  const component = {memoizedProps:props, return:fiberRoot};
+  root.__reactFiber$fixture = {stateNode:root, return:component};
+  body.__reactFiber$fixture = {stateNode:body, return:root.__reactFiber$fixture};
+  fiberRoot.child = component;
+  component.child = root.__reactFiber$fixture;
+  root.__reactFiber$fixture.child = body.__reactFiber$fixture;
+  document.body.append(root);
+  return {root, body, props, component};
+};
+const first = mount("old-1", "Old **reply**.\n\n```js\nalert('hello');\n```");
+const second = mount("old-2", "A different old reply.");
+const streaming = mount("streaming", "Partial answer", {completed:false});
+const user = mount("user", "A user message", {type:"user-message"});
+const tool = mount("tool", "Tool output", {type:"exec"});
+const noIdentity = mount(undefined, "Unknown identity");
+window.eval(script);
+const settle = async () => {await new Promise(resolve => window.setTimeout(resolve, 30));};
+await settle();
+const button = item => item.root.querySelector("[data-twintext-translate]");
+assert.ok(button(first));
+assert.ok(button(second));
+for (const item of [streaming, user, tool, noIdentity]) assert.equal(button(item), null);
+assert.equal(deliveries.length, 0, "Mounting and scanning must not translate");
+button(first).click();
+assert.deepEqual(deliveries[0], {document:"fixture-document", request:1, action:"translate", session:"thread-1", message:"old-1", text:"Old **reply**.\n\n```js\nalert('hello');\n```"});
+assert.equal(button(first).getAttribute("aria-pressed"), "true");
+button(first).click();
+assert.equal(deliveries.at(-1).action, "original");
+assert.equal(deliveries.at(-1).message, "old-1");
+button(second).click();
+assert.equal(deliveries.at(-1).message, "old-2");
+assert.equal(deliveries.at(-1).text, "A different old reply.");
+assert.equal(first.body.textContent, first.props.item.content);
+assert.equal(first.body.querySelector("[data-twintext-translate]"), null, "Buttons must be outside copied Markdown");
+assert.equal(clipboardCalls, 0);
+assert.equal(button(first).getAttribute("data-markdown-copy"), "exclude");
+
+const later = mount("mounted-by-scrolling", "A historical message mounted by scrolling");
+await settle();
+assert.ok(button(later));
+assert.equal(deliveries.length, 3);
+button(later).click();
+assert.equal(deliveries.at(-1).message, "mounted-by-scrolling");
+streaming.props.item = {...streaming.props.item, completed:true, content:"Completed answer"};
+streaming.body.textContent = "Completed answer";
+await settle();
+assert.ok(button(streaming), "Completed streaming replies become manually translatable");
+assert.equal(deliveries.length, 4);
+
+// React can recycle a host node; read its current props again at click time.
+later.props.item = {...later.props.item, searchItemId:"recycled", content:"New exact content"};
+later.body.textContent = "New exact content";
+button(later).click();
+assert.equal(deliveries.at(-1).message, "recycled");
+assert.equal(deliveries.at(-1).text, "New exact content");
+assert.equal(deliveries.at(-1).action, "translate");
+const disconnectedButton = button(second);
+second.root.remove();
+disconnectedButton.click();
+assert.equal(deliveries.length, 5, "Detached messages must not send stale text");
+later.props.item.completed = false;
+button(later).click();
+assert.equal(deliveries.length, 5, "A stale button must not send a streaming message");
+
+window.__twintextMessages.feedback({document:"fixture-document", request:4, state:"error"});
+// An old completion cannot change a more recent request on the same button.
+assert.equal(button(later).getAttribute("aria-pressed"), "true");
+window.__twintextMessages.feedback({document:"fixture-document", request:5, state:"error"});
+assert.equal(button(later).getAttribute("aria-pressed"), "false");
+later.props.item.completed = true;
+window.eval(script);
+await settle();
+assert.equal(first.root.querySelectorAll("[data-twintext-translate]").length, 1, "Reinjection must not duplicate buttons");
+const oldCount = deliveries.length;
+button(first).click();
+assert.equal(deliveries.length, oldCount + 1, "Reinjection must not duplicate listeners");
+
+// Host elements can retain the previous React fiber after a commit.
+const stale = mount("fiber-old", "Stale render");
+const hostRoot = {return:null, stateNode:{current:null}};
+const liveRoot = {return:null, stateNode:hostRoot.stateNode, alternate:hostRoot};
+hostRoot.alternate = liveRoot;
+hostRoot.stateNode.current = liveRoot;
+stale.component.return = hostRoot;
+const liveComponent = {return:liveRoot, memoizedProps:{...stale.props,
+  item:{...stale.props.item, searchItemId:"fiber-current", content:"Current committed Markdown"}}};
+const liveOuter = {stateNode:stale.root, return:liveComponent};
+stale.body.__reactFiber$fixture.alternate = {stateNode:stale.body, return:liveOuter};
+liveRoot.child = liveComponent;
+liveComponent.child = liveOuter;
+liveOuter.child = stale.body.__reactFiber$fixture.alternate;
+await settle();
+button(stale).click();
+assert.equal(deliveries.at(-1).message, "fiber-current");
+assert.equal(deliveries.at(-1).text, "Current committed Markdown");
+const shared = mount("shared-child", "Shared mounted child");
+await settle();
+const oldHostRoot = shared.component.return;
+const newHostRoot = {stateNode:oldHostRoot.stateNode, child:shared.component, return:null};
+oldHostRoot.alternate = newHostRoot;
+newHostRoot.alternate = oldHostRoot;
+oldHostRoot.stateNode.current = newHostRoot;
+button(shared).click();
+assert.equal(deliveries.at(-1).message, "shared-child", "Root commits can retain a mounted child with no alternate");
+window.__twintextMessages.stop();
+assert.equal(document.querySelectorAll("[data-twintext-translate]").length, 0);
+assert.equal(first.body.textContent, first.props.item.content);
+dom.window.close();
+
+const early = new JSDOM("<!doctype html><html><body></body></html>", {runScripts:"outside-only"});
+const root = early.window.document.documentElement;
+root.remove();
+early.window.fixtureBinding = () => {};
+early.window.TWINTEXT_MESSAGE_CONFIG = {binding:"fixtureBinding", document:"early", language:"en"};
+assert.doesNotThrow(() => early.window.eval(script), "Reload injection runs before HTML exists");
+early.window.document.append(root);
+early.window.document.dispatchEvent(new early.window.Event("DOMContentLoaded"));
+early.window.__twintextMessages.stop();
+early.window.close();
+console.log("Message buttons: exact historical targets, manual clicks, original toggle, source/clipboard preservation, mutation, recycling and cleanup passed.");
