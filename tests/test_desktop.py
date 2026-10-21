@@ -1,5 +1,7 @@
+import json
 import os
 import queue
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -16,7 +18,7 @@ from test_markdown_formats import TABLE  # noqa: E402
 
 from twintext.bridge import Inbox  # noqa: E402
 from twintext.cache import Cache  # noqa: E402
-from twintext.config import LANGUAGES, load_settings, update_settings  # noqa: E402
+from twintext.config import LANGUAGES, config_dir, load_settings, update_settings  # noqa: E402
 from twintext.desktop import WORDS, Companion, run  # noqa: E402
 from twintext.service import Service  # noqa: E402
 
@@ -45,6 +47,21 @@ class PendingAdapter:
 
 
 class DesktopTests(unittest.TestCase):
+    def test_manual_settings_do_not_offer_retired_methods_or_automatic_controls(self):
+        for key in ("location", "response_scope"):
+            self.assertNotIn(key, self.window.selects)
+        for key in ("message_buttons", "translate_questions", "start"):
+            self.assertNotIn(key, self.window.checks)
+        self.window.poll()
+        self.window.settings_button.click()
+        self.window.selects["mode"].setCurrentIndex(1)
+        self.window.checks["session_cache"].click()
+        self.window.settings_button.click()
+        self.window.poll()
+        self.assertFalse(self.window.quitting)
+        self.assertEqual(self.window.message_adapter.status, "buttons_connected")
+        self.assertEqual(self.worker.jobs, [])
+
     def test_message_buttons_translate_only_clicked_reply_and_toggle_original(self):
         with patch("twintext.desktop.MessageAdapter", PendingAdapter):
             update_settings(workflow="chat", chat_presentation="floating", message_buttons=True,
@@ -146,16 +163,15 @@ class DesktopTests(unittest.TestCase):
         update_settings(workflow="chat", chat_presentation="floating")
         self.window.poll()
         with patch("twintext.desktop.MessageAdapter", PendingAdapter):
-            self.window.checks["message_buttons"].click()
             self.window.checks["session_cache"].click()
             self.assertTrue(load_settings().message_buttons)
             self.assertEqual(load_settings().cache_lifetime, "session")
             for language in LANGUAGES:
                 self.window.settings = update_settings(ui_language=language)
                 self.window.localize()
-                self.assertTrue(self.window.checks["message_buttons"].text())
+                self.assertTrue(self.window.checks["enabled"].text())
                 self.assertTrue(self.window.checks["session_cache"].text())
-                self.assertTrue(self.window.checks["message_buttons"].isChecked())
+                self.assertTrue(self.window.checks["enabled"].isChecked())
                 self.assertTrue(self.window.checks["session_cache"].isChecked())
 
     def test_google_provider_is_localized_and_failure_keeps_original(self):
@@ -170,21 +186,13 @@ class DesktopTests(unittest.TestCase):
             self.assertTrue(self.window.google_notice.text())
             self.assertEqual(self.window.selects["target"].currentData(), "zh-TW")
             self.assertEqual(self.window.selects["ui"].findData("zh-TW"), -1)
-        self.inbox.publish(payload(text="Original answer"))
-        self.window.poll()
+        self.click_reply(text="Original answer")
         revision = self.worker.jobs[-1][0]
         self.worker.results.put((revision, None, "Google Free network request failed."))
         self.window.poll()
         self.assertEqual(self.window.reader.toPlainText(), "Original answer")
         self.assertIn("Google Free", self.window.status.text())
 
-    def test_display_location_selects_floating_chat_in_one_step(self):
-        with patch.object(self.app, "quit") as quit_app:
-            location = self.window.selects["location"]
-            location.setCurrentIndex(location.findData("chat-floating"))
-            quit_app.assert_not_called()
-        self.assertTrue(load_settings().floating_chat)
-        self.assertTrue(self.window.orb.isVisible())
 
     def test_settings_occupy_body_and_back_restores_paste_editor(self):
         self.window.show()
@@ -203,26 +211,12 @@ class DesktopTests(unittest.TestCase):
         self.assertTrue(self.window.editor.isVisible())
         self.assertTrue(self.window.translate_button.isVisible())
 
-    def test_inline_choice_keeps_settings_open_until_back(self):
-        self.window.show()
-        self.window.settings_button.click()
-        with patch.object(self.app, "quit") as quit_app:
-            combo = self.window.selects["location"]
-            combo.setCurrentIndex(combo.findData("chat-inline"))
-            self.assertTrue(self.window.preference_scroll.isVisible())
-            self.assertFalse(self.window.orb.isVisible())
-            quit_app.assert_not_called()
-            self.window.selects["response_scope"].setCurrentIndex(1)
-            self.window.settings_button.click()
-            quit_app.assert_called_once_with()
-        self.assertEqual(load_settings().response_scope, "all")
 
     def test_reader_toggle_reuses_translation_without_changing_preferences(self):
         self.window.settings = update_settings(workflow="chat", chat_presentation="floating")
         self.window.localize()
         text = "Original English.\n\n```sh\nnpm test\n```\n"
-        self.inbox.publish(payload(text=text), archive=True)
-        self.window.poll()
+        self.click_reply(text=text)
         self.deliver_result()
         saved = load_settings()
         jobs = len(self.worker.jobs)
@@ -236,8 +230,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.app.clipboard().text(), text)
 
     def test_reader_toggle_cancels_pending_result_and_can_translate_again(self):
-        self.inbox.publish(payload(text="Hello"))
-        self.window.poll()
+        self.click_reply(text="Hello")
         revision = self.worker.jobs[-1][0]
         with patch.object(self.window, "cancel_translation") as cancel:
             self.window.toggle_button.click()
@@ -252,8 +245,9 @@ class DesktopTests(unittest.TestCase):
     def test_reader_toggle_from_original_mode_and_after_failure(self):
         self.window.settings = update_settings(mode="original")
         self.window.localize()
-        self.inbox.publish(payload(text="Hello"))
+        self.inbox.publish(payload(text="Hello"), archive=True)
         self.window.poll()
+        self.window.sessions.setCurrentIndex(0)
         self.assertFalse(self.worker.jobs)
         self.window.toggle_button.click()
         revision = self.worker.jobs[-1][0]
@@ -266,32 +260,26 @@ class DesktopTests(unittest.TestCase):
         self.assertIn("译:Hello", self.window.reader.toPlainText())
         self.assertEqual(load_settings().mode, "original")
 
-    def test_new_reply_restores_saved_display_mode_after_temporary_toggle(self):
-        for mode in ("bilingual", "translated", "original"):
-            with self.subTest(mode=mode):
-                self.window.clear()
-                self.worker.jobs.clear()
-                self.window.settings = update_settings(mode=mode)
-                self.inbox.publish(payload(text="First"))
-                self.window.poll()
-                self.window.toggle_button.click()
-                self.inbox.publish(payload(turn="next", text="Second"))
-                self.window.poll()
-                if mode == "original":
-                    self.assertEqual(self.window.reader.toPlainText(), "Second")
-                    self.assertEqual(len(self.worker.jobs), 1)
-                else:
-                    self.deliver_result()
-                    visible = self.window.reader.toPlainText()
-                    self.assertIn("译:Second", visible)
-                    self.assertEqual(visible.count("Second"), 2 if mode == "bilingual" else 1)
+    def test_arriving_history_never_replaces_or_translates_the_clicked_reply(self):
+        self.click_reply(text="First")
+        self.deliver_result()
+        jobs = len(self.worker.jobs)
+        self.inbox.publish(payload(turn="next", text="Second"), archive=True)
+        self.window.poll()
+        self.assertEqual(len(self.worker.jobs), jobs)
+        self.assertEqual(self.window.text, "First")
+        self.window.sessions.setCurrentIndex(0)
+        self.assertEqual(self.window.reader.toPlainText(), "Second")
+        self.assertEqual(len(self.worker.jobs), jobs)
+        self.window.toggle_button.click()
+        self.deliver_result()
+        self.assertIn("译:Second", self.window.reader.toPlainText())
 
     def test_floating_chat_button_toggles_reader_and_copy_preserves_original(self):
         self.window.settings = update_settings(workflow="chat", chat_presentation="floating")
         self.window.localize()
         text = "Original English.\n\n```sh\nnpm test\n```\n"
-        self.inbox.publish(payload(text=text), archive=True)
-        self.window.poll()
+        self.click_reply(text=text)
         self.deliver_result()
         jobs = len(self.worker.jobs)
         self.window.collapse()
@@ -311,20 +299,20 @@ class DesktopTests(unittest.TestCase):
     def test_floating_reader_reuses_saved_translations_for_previous_replies(self):
         self.window.settings = update_settings(workflow="chat", chat_presentation="floating")
         self.window.localize()
-        self.inbox.publish(payload(text="First"), archive=True)
-        self.window.poll()
+        self.click_reply(text="First")
         self.deliver_result()
-        self.inbox.publish(payload(turn="next", text="Second"), archive=True)
-        self.window.poll()
+        self.click_reply(turn="next", text="Second")
         self.deliver_result()
         self.assertEqual(self.window.sessions.count(), 2)
         jobs = len(self.worker.jobs)
         self.window.sessions.setCurrentIndex(1)
+        self.window.toggle_button.click()
         self.assertIn("译:First", self.window.reader.toPlainText())
         self.assertEqual(len(self.worker.jobs), jobs)
         Cache().clear()
         self.window.sessions.setCurrentIndex(0)
         self.window.sessions.setCurrentIndex(1)
+        self.window.toggle_button.click()
         self.assertIn("译:First", self.window.reader.toPlainText())
         self.assertEqual(len(self.worker.jobs), jobs)
 
@@ -374,67 +362,6 @@ class DesktopTests(unittest.TestCase):
         self.assertFalse(self.window.isVisible())
         self.assertFalse(self.window.orb.isVisible())
 
-    def test_switch_to_chat_in_reader_preferences_quits(self):
-        self.window.show()
-        with patch.object(self.app, "quit") as quit_app:
-            combo = self.window.selects["location"]
-            combo.setCurrentIndex(combo.findData("chat-inline"))
-            quit_app.assert_called_once_with()
-        self.assertEqual(load_settings().workflow, "chat")
-        self.assertFalse(self.window.isVisible())
-        self.assertFalse(self.window.orb.isVisible())
-
-    def test_external_switch_to_chat_does_not_reopen_for_pending_activation(self):
-        self.inbox.publish(payload())
-        self.window.poll()
-        self.window.collapse()
-        jobs = len(self.worker.jobs)
-        self.inbox.activate()
-        update_settings(workflow="chat")
-        with patch.object(self.app, "quit") as quit_app:
-            self.window.poll()
-            quit_app.assert_called_once_with()
-            self.window.poll()
-            self.window.expand()
-            self.window.collapse()
-            self.assertEqual(quit_app.call_count, 1)
-        self.assertFalse(self.window.isVisible())
-        self.assertFalse(self.window.orb.isVisible())
-        self.assertEqual(len(self.worker.jobs), jobs)
-
-    def test_background_start_in_chat_does_not_create_a_reader(self):
-        update_settings(workflow="chat")
-        with patch("twintext.desktop.desktop_lock") as acquire:
-            self.assertEqual(run(background=True), 0)
-            acquire.assert_not_called()
-
-    def test_chat_switch_during_startup_exits_without_entering_event_loop(self):
-        desktop = load_settings()
-        chat = update_settings(workflow="chat")
-        for states in ([desktop, chat, chat], [desktop, desktop, chat]):
-            with self.subTest(states=states):
-                windows = []
-
-                def create(windows=windows):
-                    window = Companion(self.inbox, self.worker)
-                    windows.append(window)
-                    self.addCleanup(window.orb.deleteLater)
-                    self.addCleanup(window.deleteLater)
-                    return window
-
-                with (
-                    patch("twintext.desktop.load_settings", side_effect=states),
-                    patch("twintext.desktop.desktop_lock") as acquire,
-                    patch("twintext.desktop.Companion", side_effect=create),
-                    patch.object(self.app, "exec", return_value=0) as execute,
-                    patch.object(self.app, "quit"),
-                ):
-                    self.assertEqual(run(background=True), 0)
-                    execute.assert_not_called()
-                    acquire.return_value.close.assert_called_once_with()
-                self.assertTrue(windows[0].quitting)
-                self.assertFalse(windows[0].orb.isVisible())
-                self.assertFalse(windows[0].isVisible())
 
     def test_manual_reader_in_chat_still_opens_for_settings(self):
         chat = update_settings(workflow="chat")
@@ -443,7 +370,7 @@ class DesktopTests(unittest.TestCase):
 
         def execute():
             self.assertTrue(self.window.isVisible())
-            self.assertFalse(self.window.orb.isVisible())
+            self.assertTrue(self.window.orb.isVisible())
             return 0
 
         with (
@@ -514,25 +441,6 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(combo.currentData(), "translated")
         self.assertEqual(load_settings().mode, "translated")
 
-    def test_chat_controls_default_save_and_disable_in_desktop_workflow(self):
-        scope = self.window.selects["response_scope"]
-        questions = self.window.checks["translate_questions"]
-        self.assertEqual(scope.currentData(), "final")
-        self.assertTrue(questions.isChecked())
-        self.assertFalse(scope.isEnabled())
-        self.assertFalse(questions.isEnabled())
-        combo = self.window.selects["location"]
-        combo.setCurrentIndex(combo.findData("chat-floating"))
-        self.assertTrue(scope.isEnabled())
-        self.assertTrue(questions.isEnabled())
-        scope.setCurrentIndex(scope.findData("all"))
-        questions.setChecked(False)
-        self.assertEqual(load_settings().response_scope, "all")
-        self.assertFalse(load_settings().translate_questions)
-        combo.setCurrentIndex(combo.findData("desktop"))
-        self.assertFalse(scope.isEnabled())
-        self.assertEqual(load_settings().response_scope, "all")
-        self.assertFalse(load_settings().translate_questions)
 
     def test_provider_selection_status_and_conditional_credentials(self):
         self.assertEqual(self.window.selects["provider"].currentData(), "offline")
@@ -555,6 +463,16 @@ class DesktopTests(unittest.TestCase):
         environment = patch.dict(os.environ, {"TWINTEXT_HOME": directory.name})
         environment.start()
         self.addCleanup(environment.stop)
+        slot_errors = []
+        exception_hook = patch.object(
+            sys, "excepthook", lambda kind, value, trace: slot_errors.append(str(value))
+        )
+        exception_hook.start()
+        self.addCleanup(exception_hook.stop)
+        self.addCleanup(lambda: self.assertEqual(slot_errors, [], "Qt slot raised an exception"))
+        adapter = patch("twintext.desktop.MessageAdapter", PendingAdapter)
+        adapter.start()
+        self.addCleanup(adapter.stop)
         update_settings(target="zh", desktop_auto_start=False)
         self.inbox = Inbox()
         self.worker = PendingTranslator()
@@ -570,30 +488,50 @@ class DesktopTests(unittest.TestCase):
         self.window.deleteLater()
         self.app.processEvents()
 
+    def click_reply(self, text="Hello", turn="first"):
+        """An explicit per-reply gesture at the adapter/reader boundary, never auto capture."""
+        self.window.poll()
+        self.window.message_adapter.events.put({
+            "document": "fixture", "request": len(self.worker.jobs) + 1,
+            "action": "translate", "session": "test-session", "message": turn, "text": text,
+        })
+        self.window.poll()
+
+    def test_external_legacy_mode_writes_do_not_remove_buttons_or_quit_reader(self):
+        self.window.poll()
+        self.window.expand()
+        adapter = self.window.message_adapter
+        for workflow, presentation in (("chat", "inline"), ("desktop", "inline")):
+            saved = load_settings().as_dict()
+            saved.update(workflow=workflow, chat_presentation=presentation, message_buttons=False)
+            (config_dir() / "settings.json").write_text(json.dumps(saved), encoding="utf-8")
+            self.window.poll()
+            self.assertFalse(self.window.quitting)
+            self.assertTrue(self.window.isVisible())
+            self.assertIs(self.window.message_adapter, adapter)
+            self.assertEqual(self.worker.jobs, [])
+
     def deliver_result(self):
         revision, text, source, target = self.worker.jobs[-1]
         result = self.service.translate(text, source=source, target=target, mode="translated")
         self.worker.results.put((revision, result, None))
         self.window.poll()
 
-    def test_capture_to_bilingual_reader_and_copy_does_not_modify_original(self):
+    def test_clicked_reply_is_bilingual_and_copy_keeps_original(self):
         text = "Hello world.\n\n```sh\nnpm test\n```\n"
-        self.inbox.publish(payload(text=text))
-        self.window.poll()
+        self.click_reply(text=text)
         self.deliver_result()
         self.assertIn("Hello world.", self.window.reader.toPlainText())
         self.assertIn("译:Hello world.", self.window.reader.toPlainText())
         self.assertEqual(self.window.reader.toPlainText().count("npm test"), 1)
         self.window.copy()
-        self.assertIn("译:", self.app.clipboard().text())
+        self.assertEqual(self.app.clipboard().text(), text)
         self.assertEqual(self.inbox.replies()[0]["text"], text)
 
     def test_stale_model_result_does_not_replace_a_newer_reply(self):
-        self.inbox.publish(payload(text="First"))
-        self.window.poll()
+        self.click_reply(text="First")
         old_revision = self.worker.jobs[-1][0]
-        self.inbox.publish(payload(turn="second", text="Second"))
-        self.window.poll()
+        self.click_reply(turn="second", text="Second")
         self.worker.results.put((old_revision, self.service.translate("First"), None))
         self.window.poll()
         self.assertEqual(self.window.reader.toPlainText(), "Second")
@@ -601,15 +539,16 @@ class DesktopTests(unittest.TestCase):
         self.assertIn("译:Second", self.window.reader.toPlainText())
 
     def test_display_modes_switch_without_new_inference_after_translation(self):
-        self.inbox.publish(payload(text="Hello"))
-        self.window.poll()
+        self.click_reply(text="Hello")
         self.deliver_result()
         count = len(self.worker.jobs)
         self.window.selects["mode"].setCurrentIndex(1)
+        self.window.toggle_button.click()
         self.assertEqual(self.window.reader.toPlainText(), "译:Hello")
         self.window.selects["mode"].setCurrentIndex(2)
         self.assertEqual(self.window.reader.toPlainText(), "Hello")
         self.window.selects["mode"].setCurrentIndex(0)
+        self.window.toggle_button.click()
         self.assertIn("译:Hello", self.window.reader.toPlainText())
         self.assertEqual(len(self.worker.jobs), count)
 
@@ -624,16 +563,6 @@ class DesktopTests(unittest.TestCase):
         self.window.poll()
         self.assertEqual(self.window.settings_button.text(), "Paramètres")
 
-    def test_translation_location_is_saved_without_changing_language_or_mode(self):
-        combo = self.window.selects["location"]
-        combo.setCurrentIndex(combo.findData("chat-floating"))
-        settings = load_settings()
-        self.assertEqual(settings.workflow, "chat")
-        self.assertEqual(settings.target, "zh")
-        self.assertEqual(settings.mode, "bilingual")
-        combo.setCurrentIndex(combo.findData("desktop"))
-        self.assertEqual(load_settings().workflow, "desktop")
-        self.assertEqual(load_settings().chat_presentation, "floating")
 
     def test_settings_scroll_in_a_small_window_without_clipping_controls(self):
         self.window.show()
@@ -648,8 +577,7 @@ class DesktopTests(unittest.TestCase):
             self.assertGreaterEqual(combo.height(), combo.fontMetrics().height())
 
     def test_model_error_shows_original_and_clear_invalidates_pending_work(self):
-        self.inbox.publish(payload(text="Hello"))
-        self.window.poll()
+        self.click_reply(text="Hello")
         revision = self.worker.jobs[-1][0]
         self.worker.results.put((revision, None, "No model"))
         self.window.poll()
@@ -668,21 +596,21 @@ class DesktopTests(unittest.TestCase):
         self.inbox.activate()
         self.window.poll()
         self.assertTrue(self.window.isVisible())
-        self.assertFalse(self.window.orb.isVisible())
+        self.assertTrue(self.window.orb.isVisible())
         self.assertTrue(self.window.windowFlags() & Qt.WindowType.WindowStaysOnTopHint)
         self.assertIsNone(self.window.reader.loadResource(2, "https://example.com/image.png"))
 
     def test_table_renders_and_copy_modes_preserve_rows_and_numbers(self):
-        self.inbox.publish(payload(text=TABLE))
-        self.window.poll()
+        self.click_reply(text=TABLE)
         self.deliver_result()
         plain = self.window.reader.toPlainText()
         self.assertIn("译:Fresh red apples", plain)
         self.assertIn("Fresh red apples", plain)
         self.assertEqual(plain.count("Whole wheat loaf"), 2)
         self.window.copy()
-        self.assertIn("| 译:Apples | 译:Fresh red apples | 5 |", self.app.clipboard().text())
+        self.assertEqual(self.app.clipboard().text(), TABLE)
         self.window.selects["mode"].setCurrentIndex(1)
+        self.window.toggle_button.click()
         self.assertEqual(self.window.reader.toPlainText().count("Whole wheat loaf"), 1)
         self.window.selects["mode"].setCurrentIndex(2)
         self.assertNotIn("译:", self.window.reader.toPlainText())
@@ -713,7 +641,7 @@ class DesktopTests(unittest.TestCase):
             self.assertTrue(self.window.orb.isVisible())
             QTest.mouseClick(self.window.orb_button, Qt.MouseButton.LeftButton)
             self.assertTrue(self.window.isVisible())
-            self.assertFalse(self.window.orb.isVisible())
+            self.assertTrue(self.window.orb.isVisible())
             self.assertEqual(move.call_count, 1)
 
     def test_dragging_expand_button_does_not_open_reader(self):

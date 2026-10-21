@@ -33,7 +33,10 @@ class ProtocolTests(unittest.TestCase):
     def test_initialize_and_ui_resource(self):
         result = self.request("initialize", {"protocolVersion": "2025-11-25"})["result"]
         self.assertEqual(result["protocolVersion"], "2025-11-25")
-        self.assertEqual(len(self.request("tools/list")["result"]["tools"]), 8)
+        names = {tool["name"] for tool in self.request("tools/list")["result"]["tools"]}
+        self.assertNotIn("twintext_send_to_reader", names)
+        self.assertTrue({"twintext_translate", "twintext_set_settings",
+                         "twintext_open_desktop", "twintext_settings_ui"} <= names)
         resource = self.request("resources/read", {"uri": UI_URI})["result"]["contents"][0]
         self.assertIn("embedded: true", resource["text"])
         self.assertIn("ui/initialize", resource["text"])

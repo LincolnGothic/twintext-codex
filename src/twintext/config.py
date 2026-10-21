@@ -65,11 +65,11 @@ class Settings:
     desktop_auto_start: bool = True
     always_on_top: bool = True
     follow_codex: bool = False
-    workflow: str = "desktop"
+    workflow: str = "chat"
     response_scope: str = "final"
     translate_questions: bool = True
-    chat_presentation: str = "inline"
-    message_buttons: bool = False
+    chat_presentation: str = "floating"
+    message_buttons: bool = True
 
     @property
     def floating_chat(self):
@@ -112,7 +112,8 @@ class Settings:
             raise TwinTextError(
                 "Enabled, cache, auto-start, always-on-top, follow and questions must be booleans."
             )
-        return self
+        # Accept valid older profiles, but never reactivate retired display methods.
+        return replace(self, workflow="chat", chat_presentation="floating", message_buttons=True)
 
     def as_dict(self):
         return asdict(self)

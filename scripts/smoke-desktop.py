@@ -1,4 +1,4 @@
-"""Offscreen hook → inbox → real model → Qt reader smoke check; no model requests."""
+"""Offscreen Paste → real local model → manual Qt reader smoke check."""
 
 import json
 import os
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix="twintext-desktop-smoke-") as directory:
             "TWINTEXT_PYTHON": sys.executable,
         },
     ):
-        update_settings(desktop_auto_start=False)
+        update_settings()
         message = (
             "# Votre programme est prêt\n\n"
             "Le programme fonctionne maintenant. Veuillez enregistrer le fichier.\n\n"
@@ -54,12 +54,17 @@ with tempfile.TemporaryDirectory(prefix="twintext-desktop-smoke-") as directory:
         )
         assert json.loads(hook.stdout) == {} and not hook.stderr
         app = QApplication([])
-        window = Companion()
+        with patch("twintext.desktop.MessageAdapter", return_value=None):
+            window = Companion()
+        window.timer.stop()
+        window.editor.setPlainText(message)
+        window.translate_manual()
         window.show()
         deadline = time.monotonic() + 90
         while window.last_result is None and time.monotonic() < deadline:
             app.processEvents()
-            window.poll()
+            with patch("twintext.desktop.MessageAdapter", return_value=None):
+                window.poll()
             if window.status_key == "error":
                 raise RuntimeError(window.status.text())
             time.sleep(0.05)
@@ -68,12 +73,18 @@ with tempfile.TemporaryDirectory(prefix="twintext-desktop-smoke-") as directory:
         assert window.last_result["target"] == "en"
         assert window.last_result["translation"] != message
         assert "npm test" in window.last_result["translation"]
-        assert Inbox().replies()[0]["text"] == message
+        assert Inbox().replies() == [], "Paste must not auto-capture a Codex reply"
         assert window.reader.toPlainText().count("npm test") == 3
         app.processEvents()
         output.parent.mkdir(parents=True, exist_ok=True)
         assert window.grab().save(str(output))
         window.selects["mode"].setCurrentIndex(1)
+        window.toggle_button.click()
+        while window.last_result is None and time.monotonic() < deadline:
+            with patch("twintext.desktop.MessageAdapter", return_value=None):
+                app.processEvents()
+                window.poll()
+            time.sleep(0.05)
         assert "Le programme fonctionne" not in window.reader.toPlainText()
         print(
             json.dumps(

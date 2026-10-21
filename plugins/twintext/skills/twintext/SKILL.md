@@ -1,24 +1,58 @@
 ---
 name: twintext
-description: Configure TwinText or translate replies with its Chat and Desktop workflows on Windows and Linux, using the selected Offline, Azure or experimental Google Free provider.
+description: Configure TwinText's manual per-reply reader or explicitly translate pasted text on Windows and Linux with Offline, Azure or experimental Google Free.
 ---
 
-Use TwinText's local tools and follow the selected workflow.
+TwinText has one Codex translation method: per-reply **Translate / Original**
+buttons select exact completed replies in a separate reader. Manual Paste is the
+fallback. Inline-chat translation and automatic Desktop capture/forwarding are retired.
 
-- In floating Chat with `message_buttons: true`, translation is manual. Present ordinary replies, progress and questions in their original language; do not call translation or forwarding tools for them. Stop capture is disabled. The user clicks a per-reply Translate / Original button to select that exact completed reply in the separate reader, including older replies. This experimental Windows adapter requires the dedicated `Open Codex with TwinText.cmd` launcher after exiting Codex normally; never close/restart an active Codex session for the user. It does not patch Codex files. Unsupported messages receive no button; do not substitute the latest reply or clipboard. Explicit in-chat translation requests take precedence.
-- `cache_lifetime: session` keeps both fragment and full reader-result caches in process memory only, released when TwinText exits or the computer shuts down. Existing saved disk translations are ignored; Clear cache clears both translation stores while retaining original reply history, models and settings. `cache: false` disables both fragment and reader-result cache reads/writes. The default `disk` lifetime preserves the existing persistent behavior. Original history is separate from the translation cache.
+- Keep ordinary assistant replies, progress and questions in their original language.
+  Do not call TwinText translation or forwarding tools for them. Scrolling and new
+  replies never translate automatically. The user clicks a per-reply button; no
+  translation enters model context. Explicit translation requests take precedence.
+- Open the reader with `twintext_open_desktop` or `twintext desktop`; open settings
+  with `twintext_settings_ui` or `twintext ui --open`. Windows CLI uses the installed
+  TwinText.cmd or private interpreter. Read `twintext_status` before changing settings.
+- Translation provider, source/target language, reader display, interface language,
+  enabled state, pin/follow and cache policy are independent. Save only requested
+  preferences. Do not request retired workflow, scope, question, message-mode or
+  automatic-start settings; the public settings tool/CLI no longer accept them.
+- Windows per-reply buttons require the dedicated Open Codex with TwinText.cmd
+  launcher. If it reports Waiting, the user leaves its terminal open and quits Codex
+  and its shared ChatGPT app normally, including tray instances. Never close/restart
+  an active Codex session for the user. The launcher pins installation paths and logs
+  settings provenance. It never patches Codex application files.
+- The adapter is experimental and depends on private Codex message props. Unsupported
+  messages have no button; never substitute the latest reply or clipboard. Existing
+  buttons may reconnect by opening TwinText again if Codex already has its local
+  debugging connection. Otherwise the user uses the dedicated launcher. Linux uses
+  manual Paste; the Windows launcher is not supported there.
+- The reader's Original action cancels pending translation; Translate shows it again.
+  Copy original preserves exact source Markdown. Selecting history shows original
+  text first and waits for a click. Old valid profiles migrate to this method;
+  originals, timestamps, languages, providers and unrelated preferences are retained.
+- `cache_lifetime: session` keeps fragment and reader-result translations only in
+  process memory, released when TwinText exits/shuts down. Existing disk translations
+  are ignored. `cache: false` disables both cache reads/writes. Clear cache clears
+  translations, retaining original history, settings and models. Default disk caching
+  preserves the existing persistent policy. Do not clear user data unless requested.
+- Offline is the default and stays local after model downloads. Install models only
+  when requested with Offline selected. No ordinary reply requires a tool invocation.
+- Azure sends source text to Microsoft using the user's credentials. Select only
+  on explicit request, never as a fallback. Credentials must be entered through
+  `twintext azure-configure` or native settings, never through chat/MCP/web fields.
+  Never reveal keys; status reports configured/not configured. Windows uses Credential
+  Manager; Linux uses an owner-only unencrypted private file. Microsoft pricing and
+  quotas apply; no shared key or guaranteed free service is bundled.
+- Google Free (`google-free`) is optional, keyless and unofficial, not supported by
+  Google Cloud. It may fail, change or rate-limit and guarantees no availability,
+  quality or free quota. Text is sent to Google. Select only on explicit request;
+  never as a fallback. `zh` is Simplified Chinese; Google-only `zh-TW` is Traditional.
+  Choose `zh` before switching from a Traditional profile to Offline or Azure.
 
-- Open the floating reader with `twintext_open_desktop`. Open its settings panel with `twintext_settings_ui`. CLI fallbacks are `twintext desktop` and `twintext ui --open`.
-- Read `twintext_status` before changing persistent settings. Translation language, display mode, and interface language are independent. The desktop's automatic interface language follows the last host locale supplied by the embedded settings panel, falling back to the system locale.
-- The default `workflow: desktop` translates completed replies outside this conversation. The trusted `Stop` hook forwards original text to the local inbox. Do not call `twintext_translate` for ordinary replies in this mode; use it only for an explicit in-chat translation request.
-- In `workflow: chat` with `chat_presentation: inline` (default), when translation is enabled and mode is not `original`, follow `response_scope`: `final` (default) translates informational final answers only and leaves progress updates in their original language; `all` also translates progress updates. For selected prose, compose its text, call `twintext_translate` with its Markdown, and present the returned `display` verbatim. Do not translate tool results or hidden reasoning. The trusted instruction hooks supply current preferences. This workflow uses ordinary Codex tool/context/output tokens with any selected provider.
-- In `workflow: chat` with `chat_presentation: floating` and `message_buttons: false`, keep assistant messages in their original language; never append translations to them. When question translation is enabled, Stop forwards completed final answers automatically; do not forward them twice. When questions are disabled, Stop capture is disabled: deliver only informational final passages with `kind: final`, excluding question passages even in mixed replies. With `response_scope: all`, call `twintext_send_to_reader` for original progress Markdown (`kind: progress`) before displaying it. If `translate_questions` is enabled, forward a readable question/choice summary (`kind: question`) before asking, while keeping original question tool text, IDs and hidden values intact. Use both session and turn IDs supplied by the context hook for every delivery; reuse the turn ID for retries. CLI fallback: pipe UTF-8 text to `twintext send-to-reader --kind progress --session-id <id> --turn-id <turn>` (or `--kind question` / `--kind final`), using the installed Windows launcher or private interpreter on Windows. The reader translates separately and returns no translation to model context. The small button toggles the bilingual reader; both Codex Copy and the reader's Copy original preserve original text. Original floating Chat history remains locally until received replies are cleared. Reader translations follow cache_lifetime; clearing the translation cache removes cached translations, preserving original history.
-- `translate_questions` defaults to `true` and controls user-directed questions independently of `response_scope`, including conversation questions and question cards before the final answer. In inline presentation, translate human-readable question text, titles, headers, option labels and descriptions before calling `request_user_input` or `request_user_input_async`. Preserve JSON field names, question IDs, hidden machine values, option order and required suffixes. Respect tool schema length/count limits: use concise translated labels when bilingual text cannot fit and put bilingual text in titles/descriptions where allowed. Do not translate a question tool's complete JSON as Markdown. Floating presentation forwards readable question text to the reader instead. When `translate_questions` is `false`, leave questions and their choices untranslated, even when they appear in a final answer or `all` is selected. Pausing translation overrides both controls. These controls affect Chat only; Desktop continues to capture completed final replies.
-- User instructions and current preferences take precedence over earlier translation instructions. When Chat mode is disabled or set to `original`, present new replies normally. Start a new chat after switching workflows to discard previous session instructions.
-- Save `workflow: chat` or `workflow: desktop` only when the user requests that persistent change. Both workflows use the same Markdown engine and cache.
-- Offline is the default and keeps translation local. Azure sends source text to Microsoft Azure Translator, never screenshots. Only select Azure on explicit user request; never switch providers as a fallback. Azure requires the user's own credentials, subject to Microsoft's current quotas/pricing; no shared developer key is bundled and Azure is not guaranteed free.
-- Google Free (`google-free`) is optional and keyless, uses an unofficial interface not supported by Google Cloud, may fail, change or rate-limit, and has no guaranteed availability, quality or free quota. Text is sent to Google. Select it only on explicit user request; never use it as an automatic fallback. `zh` is Simplified Chinese and `zh-TW` is Traditional Chinese (Google only); choose `zh` before switching back to Offline or Azure.
-- Credentials must be entered through `twintext azure-configure` or native desktop settings. Never ask for, accept, transmit or reveal keys through Chat, MCP or the embedded UI. Status exposes only configured/not configured. Windows uses Credential Manager; Linux uses an owner-only unencrypted private file outside normal settings. Monthly usage contains metadata only and sends no telemetry.
-- Model installation downloads official Argos assets; run only when requested and Offline is selected.
-
-The companion is a separate Windows/Linux window. Neither workflow rewrites previous messages or translates Codex menus. Desktop displays completed replies, not partial streams. Automatic capture or Chat instructions require their bundled hooks to be enabled and trusted; installation does not grant trust. Paste works independently. No macOS release is provided.
+The reader is a separate Windows/Linux window. It does not edit prior messages or
+translate Codex menus, hidden reasoning, tool results or question-card controls.
+The plugin's context hooks explain manual behavior; Stop no longer captures replies.
+Start a new chat after upgrading from retired modes to replace stale instructions.
+No macOS release is provided. User instructions override defaults.

@@ -19,12 +19,8 @@
         <form id="settings-form">
           <label for="provider" data-i18n="provider">Translation provider</label><select id="provider" name="provider"><option value="offline">Offline — Argos</option><option value="azure">Microsoft Azure Translator</option><option value="google-free">Google Free (experimental)</option></select>
           <p id="provider-hint" class="hint" hidden>Save your provider selection before translating.</p>
-          <label for="location" data-i18n="location">Display location</label><select id="location" name="location"></select>
           <label class="check"><input type="checkbox" id="follow-codex"><span data-i18n="followCodex">Follow Codex window</span></label>
           <p class="hint" data-i18n="followCodexHint">Windows and X11/XWayland. The floating button follows Codex; click to show or hide translation. Native Wayland uses manual placement.</p>
-          <label for="response-scope" data-i18n="responseScope">Chat response scope</label><select id="response-scope" name="response_scope"></select>
-          <label class="check"><input type="checkbox" id="translate-questions" checked><span data-i18n="translateQuestions">Translate questions in chat</span></label>
-          <p class="hint" data-i18n="chatHint">Chat only. Questions follow their own setting, including question cards and answer choices.</p>
           <label for="target" data-i18n="target">Translate into</label><select id="target" name="target"></select>
           <label for="source" data-i18n="source">Source language</label><select id="source" name="source"></select>
           <fieldset><legend data-i18n="display">Display mode</legend><div class="mode-group">
@@ -34,12 +30,11 @@
           </div></fieldset>
           <label for="ui-language" data-i18n="uiLanguage">Plugin display language</label><select id="ui-language" name="ui_language"></select>
           <p class="hint" data-i18n="followHint">Automatic follows Codex's language in an embedded panel, or your browser's language here.</p>
-          <label class="check"><input type="checkbox" id="enabled" checked><span data-i18n="enabled">Translate new Codex replies</span></label>
+          <label class="check"><input type="checkbox" id="enabled" checked><span data-i18n="enabled">Enable Translate buttons</span></label>
           <label class="check"><input type="checkbox" id="cache" checked><span data-i18n="cache">Remember translations locally</span></label>
           <label class="check"><input type="checkbox" id="session-cache"><span data-i18n="sessionCache">Only remember translations until TwinText exits</span></label>
           <p class="hint" data-i18n="sessionCacheHint">Session caching covers fragments and reader translations. Existing disk cache is ignored; Clear cache removes it. Originals and settings are kept.</p>
-          <label class="check"><input type="checkbox" id="message-buttons"><span data-i18n="messageButtons">Per-reply Translate buttons (experimental, manual only)</span></label>
-          <p class="hint" id="message-buttons-hint" data-i18n="messageButtonsHint">Requires the floating reader and special Windows Codex launcher. Disables automatic translation. Private Codex UI changes may break buttons.</p>
+          <p class="hint" id="manual-reader-hint" data-i18n="manualReaderHint">Click Translate / Original on a completed Codex reply. Windows requires Open Codex with TwinText.cmd; Linux uses manual Paste. Codex UI changes may affect buttons.</p>
           <button type="submit" class="primary" id="save" data-i18n="save">Save preferences</button>
           <p class="hint" data-i18n="nextReply">Preferences apply to new replies in chats with TwinText enabled.</p>
         </form>
@@ -74,7 +69,7 @@
         <button id="clear-cache" class="text-button" type="button" data-i18n="clearCache">Clear remembered translations</button>
       </div>
     </div>
-    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.9.0 · MIT</span></footer>
+    <footer><span data-i18n="footer">Built for quieter, clearer reading.</span><span>TwinText 0.10.0 · MIT</span></footer>
   </main>
   <div id="notice" role="status" aria-live="polite" hidden></div>
   <script nonce="{{TOKEN}}">window.TWINTEXT_BOOT = {token: "{{TOKEN}}", embedded: {{EMBEDDED}}};

@@ -51,8 +51,7 @@ class SessionCacheTests(unittest.TestCase):
     def test_cli_restores_manual_and_session_preferences(self):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            self.assertEqual(main(["settings", "--cache-lifetime", "session",
-                                   "--message-buttons", "true"]), 0)
+            self.assertEqual(main(["settings", "--cache-lifetime", "session"]), 0)
         self.assertTrue(json.loads(output.getvalue())["message_buttons"])
         self.assertEqual(load_settings().cache_lifetime, "session")
 

@@ -21,7 +21,7 @@ def main():
     parser.add_argument("--platform", choices=("windows", "linux"), required=True)
     args = parser.parse_args()
     version = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(), re.M)[1]
-    name = f"TwinText-{version}-{args.platform}-chat"
+    name = f"TwinText-{version}-{args.platform}"
     if os.environ.get("GITHUB_ACTIONS") != "true":
         parser.error("Run this installer smoke only on an ephemeral GitHub Actions runner.")
     with tempfile.TemporaryDirectory(prefix="twintext-installer-", dir=Path.home()) as folder:
@@ -70,10 +70,11 @@ def main():
             )
 
         settings = json.loads(run("settings").stdout)
-        assert settings["workflow"] == "chat", settings
+        assert settings["workflow"] == "chat" and settings["chat_presentation"] == "floating"
+        assert settings["message_buttons"] is True, settings
         assert not (app / "argos/packages").exists(), "Installer downloaded models unexpectedly"
         run("models", "install", "--source", "en", "--target", "zh")
-        run("settings", "--target", "zh", "--source", "en", "--desktop-auto-start", "false")
+        run("settings", "--target", "zh", "--source", "en")
         for mode in ("bilingual", "translated"):
             result = json.loads(run("translate", "--mode", mode, "--json", text=TABLE).stdout)
             assert result["translation"] != TABLE
@@ -86,52 +87,45 @@ def main():
             )
         hooks = json.loads((app / "plugin/hooks/hooks.json").read_text())["hooks"]
         environment["PLUGIN_ROOT"] = str(app / "plugin")
-        for workflow in ("chat", "desktop"):
-            run("settings", "--workflow", workflow)
-            for event in ("SessionStart", "UserPromptSubmit", "Stop"):
-                command = hooks[event][0]["hooks"][0]["commandWindows" if windows else "command"]
-                command = command.replace("${PLUGIN_ROOT}", str(app / "plugin"))
-                payload = json.dumps(
-                    {
-                        "hook_event_name": event,
-                        "session_id": "smoke",
-                        "last_assistant_message": TABLE,
-                    }
-                )
-                reply = subprocess.run(
-                    command,
-                    shell=True,
-                    input=payload,
-                    text=True,
-                    encoding="utf-8",
-                    capture_output=True,
-                    check=True,
-                    env=environment,
-                    timeout=30,
-                )
-                value = json.loads(reply.stdout)
-                if workflow == "chat" and event != "Stop":
-                    assert "Chinese" in value["hookSpecificOutput"]["additionalContext"]
-                else:
-                    assert value == {}, value
+        assert set(hooks) == {"SessionStart", "UserPromptSubmit"}
+        for event in hooks:
+            command = hooks[event][0]["hooks"][0]["commandWindows" if windows else "command"]
+            command = command.replace("${PLUGIN_ROOT}", str(app / "plugin"))
+            payload = json.dumps({"hook_event_name": event, "session_id": "smoke"})
+            reply = subprocess.run(
+                command, shell=True, input=payload, text=True, encoding="utf-8",
+                capture_output=True, check=True, env=environment, timeout=30,
+            )
+            value = json.loads(reply.stdout)
+            assert "manual per-message" in value["hookSpecificOutput"]["additionalContext"]
+        compatibility = subprocess.run(
+            [python, str(app / "plugin/hooks/capture.py")], input="{}", text=True,
+            capture_output=True, check=True, env=environment, timeout=10,
+        )
+        assert json.loads(compatibility.stdout) == {}
         # Verify actual native Qt rendering with the installed environment.
         probe = (
             "from PySide6.QtWidgets import QApplication; from twintext.desktop import Companion; "
             "from types import SimpleNamespace; import queue; "
+            "from unittest.mock import patch; "
+            "adapter=patch('twintext.desktop.MessageAdapter', return_value=None); adapter.start(); "
             "app=QApplication([]); worker=SimpleNamespace(submit=lambda *args: None, "
             "results=queue.SimpleQueue()); window=Companion(translator=worker); "
-            "assert window.selects['location'].currentData() == 'desktop'; "
+            "assert 'location' not in window.selects; assert window.settings.manual_reader; "
             "window.reader.setMarkdown(" + repr(TABLE) + "); "
             "assert 'Fresh red apples' in window.reader.toPlainText(); "
-            "window.hide(); window.orb.hide(); print('Native Qt and both hooks passed')"
+            "window.quit(); adapter.stop(); print('Native Qt and manual hooks passed')"
         )
         subprocess.run([python, "-c", probe], env=environment, check=True, timeout=30)
-        # An upgrade must retain settings and existing models irrespective of ZIP style.
-        run("settings", "--workflow", "desktop", "--ui-language", "fr")
+        # An upgrade must retain independent preferences and existing models.
+        run("settings", "--ui-language", "fr", "--mode", "translated",
+            "--cache-lifetime", "session")
         upgrade = [*installer, "-WithoutEngine"] if windows else [*installer, "--without-engine"]
         subprocess.run(upgrade, env=environment, check=True, timeout=300)
         final = json.loads(run("settings").stdout)
-        assert final["workflow"] == "desktop" and final["ui_language"] == "fr"
+        assert final["workflow"] == "chat" and final["message_buttons"]
+        assert final["ui_language"] == "fr" and final["mode"] == "translated"
+        assert final["cache_lifetime"] == "session"
         assert len(json.loads(run("models", "list").stdout)) == 1
         print(f"{args.platform}: installer, preservation, hooks, UTF-8, tables and Qt passed")
 

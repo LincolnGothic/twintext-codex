@@ -23,18 +23,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${PLUGIN_ROOT}/hooks/capture.py\"",
-            "commandWindows": "py -3 \"${PLUGIN_ROOT}/hooks/capture.py\"",
-            "timeout": 10
-          }
-        ]
-      }
     ]
   }
 }

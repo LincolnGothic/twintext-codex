@@ -91,12 +91,13 @@ class BridgeTests(unittest.TestCase):
             launch.assert_not_called()
         self.assertEqual(self.inbox.replies(), [])
 
-    def test_background_launch_happens_only_for_a_new_event_when_enabled(self):
+    def test_legacy_auto_start_cannot_capture_or_launch_new_replies(self):
         update_settings(desktop_auto_start=True)
         with patch("twintext.bridge.launch_desktop") as launch:
             capture(io.StringIO(json.dumps(payload())))
             capture(io.StringIO(json.dumps(payload())))
-            launch.assert_called_once_with(background=True)
+            launch.assert_not_called()
+        self.assertEqual(self.inbox.replies(), [])
 
     def test_stop_hook_preserves_stdin_and_returns_no_model_context(self):
         with patch.dict(os.environ, {"TWINTEXT_PYTHON": sys.executable}):
@@ -110,7 +111,7 @@ class BridgeTests(unittest.TestCase):
             )
         self.assertEqual(json.loads(result.stdout), {})
         self.assertEqual(result.stderr, "")
-        self.assertEqual(self.inbox.replies()[0]["text"], "A reply with $(literal) and `code`.")
+        self.assertEqual(self.inbox.replies(), [])
 
     def test_singleton_lock_and_activation(self):
         lock = desktop_lock()

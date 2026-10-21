@@ -11,7 +11,6 @@ import sqlite3
 import subprocess
 import sys
 import time
-import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -21,12 +20,24 @@ from twintext.locking import acquire_lock
 from twintext.service import MAX_TEXT_LENGTH
 
 MAX_SESSIONS = 24
-MAX_HOOK_BYTES = 1_100_000
 
 
 class Inbox:
     def __init__(self):
         self.path = private_dir(data_dir() / "desktop") / "inbox.sqlite3"
+        # Older Desktop profiles kept only their latest replies in this table.
+        # Archive those originals without replacing rows or losing their timestamps.
+        with self.connection() as connection:
+            for row in connection.execute("SELECT * FROM replies").fetchall():
+                fingerprint = hashlib.sha256(json.dumps(
+                    [row["session"], row["turn"], "final", row["text"]], ensure_ascii=False,
+                ).encode("utf-8")).hexdigest()
+                connection.execute(
+                    "INSERT OR IGNORE INTO history "
+                    "(fingerprint, session, turn, text, kind, created) VALUES (?, ?, ?, ?, ?, ?)",
+                    (fingerprint, row["session"], row["turn"], row["text"],
+                     "final", row["created"]),
+                )
 
     @contextmanager
     def connection(self):
@@ -124,7 +135,9 @@ class Inbox:
     def history(self):
         with self.connection() as connection:
             return [
-                dict(row) for row in connection.execute("SELECT * FROM history ORDER BY id DESC")
+                dict(row) for row in connection.execute(
+                    "SELECT * FROM history ORDER BY created DESC, id DESC"
+                )
             ]
 
     def save_translation(self, reply, provider, source, target, result):
@@ -226,42 +239,9 @@ def launch_desktop(background=False):
 
 
 def capture(stream):
-    """Fail open and return no text/context to Codex, including on malformed input."""
-    try:
-        raw = stream.read(MAX_HOOK_BYTES + 1)
-        if len(raw.encode("utf-8")) > MAX_HOOK_BYTES:
-            return
-        payload = json.loads(raw)
-        settings = load_settings()
-        if settings.manual_reader:
-            return
-        if settings.workflow != "desktop" and not settings.floating_chat:
-            return
-        if settings.floating_chat and not settings.translate_questions:
-            # Stop has no semantic question boundaries. Selected final prose is
-            # delivered explicitly when questions must be excluded.
-            return
-        if settings.floating_chat and isinstance(payload, dict) and not payload.get("turn_id"):
-            payload["turn_id"] = uuid.uuid4().hex
-        if (settings.enabled and Inbox().publish(payload, archive=settings.floating_chat)
-                and settings.desktop_auto_start):
-            launch_desktop(background=True)
-    except (TwinTextError, OSError, ValueError, TypeError, sqlite3.Error):
-        pass
+    """Compatibility no-op for already registered automatic Stop hooks."""
 
 
 def send_to_reader(text, kind="progress", session_id="codex", turn_id=""):
-    settings = load_settings()
-    if (settings.manual_reader or not settings.floating_chat
-            or not settings.enabled or settings.mode == "original"
-            or (kind == "progress" and settings.response_scope != "all")
-            or (kind == "question" and not settings.translate_questions)):
-        return {"received": False}
-    turn_id = turn_id or uuid.uuid4().hex
-    received = Inbox().publish({
-        "hook_event_name": "Stop", "last_assistant_message": text, "kind": kind,
-        "session_id": session_id, "turn_id": turn_id,
-    }, archive=True)
-    if received and settings.desktop_auto_start:
-        launch_desktop(background=True)
-    return {"received": received, "turn_id": turn_id}
+    """Compatibility no-op; only explicit reader clicks select replies now."""
+    return {"received": False}

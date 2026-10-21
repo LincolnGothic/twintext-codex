@@ -192,8 +192,8 @@ class LauncherTests(unittest.TestCase):
                 launch()
             reader.assert_not_called()
 
-    def test_launcher_requires_explicit_opt_in_and_supported_platform(self):
-        update_settings(message_buttons=False)
+    def test_launcher_honors_pause_and_supported_platform(self):
+        update_settings(enabled=False)
         with (patch("twintext.codex_launcher.sys.platform", "win32"),
               patch("twintext.codex_launcher.windows_app") as inspect):
             with self.assertRaisesRegex(TwinTextError, "settings"):
