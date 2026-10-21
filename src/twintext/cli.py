@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 from twintext import __version__
-from twintext.cache import Cache
 from twintext.config import (
+    CACHE_LIFETIMES,
     CHAT_PRESENTATIONS,
     LANGUAGES,
     MODES,
@@ -50,6 +50,8 @@ def parser():
     settings.add_argument("--ui-language", choices=["auto", *LANGUAGES])
     settings.add_argument("--enabled", choices=["true", "false"])
     settings.add_argument("--cache", choices=["true", "false"])
+    settings.add_argument("--cache-lifetime", choices=CACHE_LIFETIMES)
+    settings.add_argument("--message-buttons", choices=["true", "false"])
     settings.add_argument("--desktop-auto-start", choices=["true", "false"])
     settings.add_argument("--always-on-top", choices=["true", "false"])
     settings.add_argument("--follow-codex", choices=["true", "false"])
@@ -74,6 +76,7 @@ def parser():
     commands.add_parser("capture", help="Receive a Codex Stop event on stdin (no model calls)")
     desktop = commands.add_parser("desktop", help="Open the floating desktop reader")
     desktop.add_argument("--background", action="store_true", help="Start as a compact button")
+    commands.add_parser("codex-launch", help="Launch Windows Codex with optional message buttons")
     ui = commands.add_parser("ui", help="Open the settings page on localhost")
     ui.add_argument("--port", type=int, default=0)
     ui.add_argument("--open", action="store_true", dest="open_browser")
@@ -109,6 +112,10 @@ def main(argv=None):
             from twintext.ui import serve
 
             serve(args.port, args.open_browser)
+        elif args.command == "codex-launch":
+            from twintext.codex_launcher import launch
+
+            print(json.dumps(launch()))
         elif args.command == "translate":
             text = (
                 Path(args.file).read_text(encoding="utf-8")
@@ -149,6 +156,8 @@ def main(argv=None):
                     "ui_language",
                     "enabled",
                     "cache",
+                    "cache_lifetime",
+                    "message_buttons",
                     "desktop_auto_start",
                     "always_on_top",
                     "follow_codex",
@@ -156,7 +165,7 @@ def main(argv=None):
                 if getattr(args, key) is not None
             }
             for key in ("enabled", "cache", "desktop_auto_start", "always_on_top",
-                        "translate_questions", "follow_codex"):
+                        "translate_questions", "follow_codex", "message_buttons"):
                 if key in changes:
                     changes[key] = changes[key] == "true"
             value = update_settings(**changes) if changes else load_settings()
@@ -164,7 +173,9 @@ def main(argv=None):
         elif args.command == "status":
             print(json.dumps(Service().status(), ensure_ascii=False, indent=2))
         elif args.command == "clear-cache":
-            Cache().clear()
+            from twintext.bridge import Inbox
+
+            Inbox().clear_translations()
             print("Translation cache cleared.")
         elif args.command == "context":
             print(context(args.session_id, args.turn_id))

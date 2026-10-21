@@ -54,6 +54,10 @@ def windows_launchers(app):
     (app / "Open TwinText.cmd").write_text(
         f'@echo off\r\nstart "" "{pythonw}" -m twintext.cli desktop\r\n', encoding="utf-8"
     )
+    (app / "Open Codex with TwinText.cmd").write_text(
+        f'@echo off\r\n"{str(python).replace("%", "%%")}" -m twintext.cli codex-launch\r\n'
+        'if errorlevel 1 pause\r\n', encoding="utf-8",
+    )
     # Per-user Start menu shortcut; no PATH, registry, or machine configuration edits.
     start = Path(os.environ.get("APPDATA", str(Path.home() / "AppData/Roaming")))
     start /= "Microsoft/Windows/Start Menu/Programs"

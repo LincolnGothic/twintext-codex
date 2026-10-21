@@ -132,3 +132,16 @@ MCP/web UI report a configured boolean. Usage metadata is atomically written und
 a process lock. Azure timeout is 15 seconds per request. Engine cancellation is
 cooperative at request boundaries; in-flight synchronous I/O waits for the bounded
 timeout. Desktop retains its revision guard to discard obsolete results.
+
+The optional Windows manual-message adapter lives in `message_adapter.py` and
+`web/message-buttons.js`. It selects one app://- main renderer through fixed
+loopback CDP, validates default main-frame binding events, and sends only clicked
+completed messages to the existing reader worker. The committed React child tree
+supplies message identity and Markdown. Buttons sit outside copied text; message
+bodies and app files remain unchanged. Context resets cancel pending reader work.
+The private UI contract is experimental and needs native compatibility testing.
+
+`cache_lifetime: session` uses the Cache interface with bounded process memory.
+Full reader results follow the same policy and bypass saved SQLite translations;
+original history stays in the inbox. Clear cache clears both translation stores,
+preserving originals. Defaults remain disk caching and automatic translation.

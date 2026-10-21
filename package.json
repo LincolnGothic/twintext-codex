@@ -1,0 +1,6 @@
+{
+  "name": "twintext-dom-tests",
+  "private": true,
+  "scripts": {"test": "node tests/test_message_buttons.mjs && node tests/test_chat_ui.mjs && node tests/test_provider_ui.mjs"},
+  "devDependencies": {"jsdom": "26.1.0"}
+}

@@ -15,6 +15,7 @@ MODES = ("bilingual", "translated", "original")
 WORKFLOWS = ("desktop", "chat")
 RESPONSE_SCOPES = ("final", "all")
 CHAT_PRESENTATIONS = ("inline", "floating")
+CACHE_LIFETIMES = ("disk", "session")
 PROVIDERS = ("offline", "azure", "google-free")
 
 
@@ -58,6 +59,7 @@ class Settings:
     mode: str = "bilingual"
     enabled: bool = True
     cache: bool = True
+    cache_lifetime: str = "disk"
     ui_language: str = "auto"
     host_locale: str = "auto"
     desktop_auto_start: bool = True
@@ -67,14 +69,21 @@ class Settings:
     response_scope: str = "final"
     translate_questions: bool = True
     chat_presentation: str = "inline"
+    message_buttons: bool = False
 
     @property
     def floating_chat(self):
         return self.workflow == "chat" and self.chat_presentation == "floating"
 
+    @property
+    def manual_reader(self):
+        return self.floating_chat and self.message_buttons
+
     def validate(self):
         if self.provider not in PROVIDERS:
             raise TwinTextError("Provider must be offline, azure or google-free.")
+        if self.cache_lifetime not in CACHE_LIFETIMES:
+            raise TwinTextError("Cache lifetime must be disk or session.")
         if self.workflow not in WORKFLOWS:
             raise TwinTextError("Workflow must be desktop or chat.")
         if self.response_scope not in RESPONSE_SCOPES:
@@ -98,7 +107,7 @@ class Settings:
         if any(
             type(value) is not bool
             for value in (self.enabled, self.cache, self.desktop_auto_start, self.always_on_top,
-                          self.translate_questions, self.follow_codex)
+                          self.translate_questions, self.follow_codex, self.message_buttons)
         ):
             raise TwinTextError(
                 "Enabled, cache, auto-start, always-on-top, follow and questions must be booleans."

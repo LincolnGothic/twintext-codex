@@ -9,7 +9,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORIES = ("src", "plugins", "scripts", "docs", "tests", ".agents", ".github")
-FILES = ("pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", ".gitignore")
+FILES = ("pyproject.toml", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", ".gitignore",
+         "package.json", "pnpm-lock.yaml")
 
 
 def build(platform, output):

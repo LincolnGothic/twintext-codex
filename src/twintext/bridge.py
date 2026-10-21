@@ -15,6 +15,7 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
+from twintext.cache import Cache
 from twintext.config import TwinTextError, data_dir, load_settings, private_dir
 from twintext.locking import acquire_lock
 from twintext.service import MAX_TEXT_LENGTH
@@ -113,6 +114,12 @@ class Inbox:
             connection.execute("DELETE FROM replies")
             connection.execute("DELETE FROM history")
             connection.execute("DELETE FROM history_translations")
+        Cache(memory=True).clear()
+
+    def clear_translations(self):
+        Cache().clear()
+        with self.connection() as connection:
+            connection.execute("DELETE FROM history_translations")
 
     def history(self):
         with self.connection() as connection:
@@ -121,15 +128,32 @@ class Inbox:
             ]
 
     def save_translation(self, reply, provider, source, target, result):
+        settings = load_settings()
+        if not settings.cache:
+            return
         with self.connection() as connection:
             # A cleared inbox or stale worker must not recreate deleted history.
             if connection.execute("SELECT 1 FROM history WHERE id = ?", (reply,)).fetchone():
+                if settings.cache_lifetime == "session":
+                    Cache(memory=True).put(
+                        "reader:" + Cache.key(str(reply), provider, source, target),
+                        json.dumps(result, ensure_ascii=False),
+                    )
+                    return
                 connection.execute(
                     "INSERT OR REPLACE INTO history_translations VALUES (?, ?, ?, ?, ?)",
                     (reply, provider, source, target, json.dumps(result, ensure_ascii=False)),
                 )
 
     def translation(self, reply, provider, source, target):
+        settings = load_settings()
+        if not settings.cache:
+            return None
+        if settings.cache_lifetime == "session":
+            saved = Cache(memory=True).get(
+                "reader:" + Cache.key(str(reply), provider, source, target)
+            )
+            return json.loads(saved) if saved else None
         with self.connection() as connection:
             row = connection.execute(
                 "SELECT result FROM history_translations "
@@ -209,6 +233,8 @@ def capture(stream):
             return
         payload = json.loads(raw)
         settings = load_settings()
+        if settings.manual_reader:
+            return
         if settings.workflow != "desktop" and not settings.floating_chat:
             return
         if settings.floating_chat and not settings.translate_questions:
@@ -226,7 +252,8 @@ def capture(stream):
 
 def send_to_reader(text, kind="progress", session_id="codex", turn_id=""):
     settings = load_settings()
-    if (not settings.floating_chat or not settings.enabled or settings.mode == "original"
+    if (settings.manual_reader or not settings.floating_chat
+            or not settings.enabled or settings.mode == "original"
             or (kind == "progress" and settings.response_scope != "all")
             or (kind == "question" and not settings.translate_questions)):
         return {"received": False}

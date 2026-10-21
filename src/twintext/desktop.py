@@ -41,6 +41,7 @@ from twintext.config import (
     update_settings,
 )
 from twintext.credentials import load_credentials, save_credentials
+from twintext.message_adapter import MessageAdapter
 from twintext.service import Service
 from twintext.usage import CloudUsage, usage_label
 from twintext.window_follow import WindowFollower
@@ -400,6 +401,52 @@ for _language, _labels in {
     )))
 
 
+for _language, _labels in {
+    "en": ("Per-reply Translate buttons (experimental, manual only)",
+           "Only remember translations until TwinText exits",
+           "Requires Floating reader beside Codex and the special Codex launcher. "
+           "Disables automatic translation. Private Codex UI changes may break buttons.",
+           "Waiting for Codex. Exit Codex, then use Open Codex with TwinText.cmd.",
+           "Connected. Open a completed reply; unsupported layouts show no button.",
+           "Session cache covers fragments and reader translations. Existing disk cache "
+           "is ignored; Clear cache removes it. Originals and settings are kept."),
+    "zh": ("逐条回复翻译按钮（实验性，仅手动翻译）", "仅本次运行缓存译文（退出后释放）",
+           "需选择 Codex 旁浮动阅读器，并使用专用启动器。启用后关闭自动翻译。"
+           "Codex 内部界面变更可能导致按钮失效。",
+           "等待连接。退出 Codex 后，运行 Open Codex with TwinText.cmd。",
+           "已连接。请打开已完成的回复；不兼容的消息布局不会显示按钮。",
+           "仅在内存中保存翻译片段和阅读器译文，忽略旧磁盘缓存。"
+           "点击“清除缓存”可清除旧译文，保留原文和设置。"),
+    "ja": ("返信ごとの翻訳ボタン（試験的・手動のみ）", "TwinText 終了まで訳文を記憶",
+           "Codex 横のリーダーと専用ランチャーが必要です。自動翻訳を停止します。"
+           "Codex の内部 UI 変更により動作しなくなる場合があります。",
+           "接続待ち。Codex を終了し Open Codex with TwinText.cmd を実行してください。",
+           "接続済み。完了した返信を開いてください。非対応の表示にはボタンは出ません。",
+           "断片とリーダーの訳文をメモリ内だけに保存。既存のディスクキャッシュは無視し、"
+           "キャッシュ消去で削除します。原文と設定は保持します。"),
+    "fr": ("Boutons Traduire par réponse (expérimental, manuel)",
+           "Garder les traductions jusqu’à la fermeture de TwinText",
+           "Lecteur à côté de Codex et lanceur spécial requis. Désactive la traduction "
+           "automatique. Les changements internes de Codex peuvent casser les boutons.",
+           "En attente. Fermez Codex et lancez Open Codex with TwinText.cmd.",
+           "Connecté. Ouvrez une réponse terminée ; les vues non compatibles n’ont pas de bouton.",
+           "Fragments et traductions du lecteur en mémoire seulement. Le cache disque est ignoré ; "
+           "Effacer le cache le supprime. Originaux et préférences conservés."),
+    "es": ("Botones Traducir por respuesta (experimental, manual)",
+           "Recordar traducciones solo hasta cerrar TwinText",
+           "Requiere el lector junto a Codex y el lanzador especial. Desactiva la traducción "
+           "automática. Los cambios internos de Codex pueden romper los botones.",
+           "Esperando. Cierra Codex y ejecuta Open Codex with TwinText.cmd.",
+           "Conectado. Abre una respuesta completa; las vistas incompatibles no muestran botones.",
+           "Fragmentos y traducciones del lector solo en memoria. Se ignora la caché en disco; "
+           "Borrar caché la elimina. Se conservan originales y ajustes."),
+}.items():
+    WORDS[_language].update(dict(zip(
+        ("message_buttons", "session_cache", "buttons_hint", "buttons_waiting",
+         "buttons_connected", "session_cache_hint"), _labels, strict=True,
+    )))
+
+
 def display_text(result, mode):
     if mode == "original":
         return result["original"]
@@ -526,6 +573,8 @@ class Companion(QWidget):
         self.paste_visible = False
         self.reply_id = None
         self.pending_translation = None
+        self.message_adapter = None
+        self.message_request = None
         self.rows = []
         self.ids = ()
         self.activation = self.inbox.activation()
@@ -584,10 +633,15 @@ class Companion(QWidget):
         self.google_notice.setObjectName("muted")
         form.insertRow(1, self.google_notice)
         self.checks = {}
-        for key in ("enabled", "translate_questions", "cache", "start", "pin", "follow"):
+        for key in ("enabled", "message_buttons", "translate_questions", "cache",
+                    "session_cache", "start", "pin", "follow"):
             box = QCheckBox()
             self.checks[key] = box
             form.addRow(box)
+        self.buttons_hint = QLabel()
+        self.buttons_hint.setWordWrap(True)
+        self.buttons_hint.setObjectName("muted")
+        form.addRow(self.buttons_hint)
         self.follow_hint = QLabel()
         self.follow_hint.setWordWrap(True)
         self.follow_hint.setObjectName("muted")
@@ -756,6 +810,10 @@ class Companion(QWidget):
         self.orb_quit_button.setToolTip(self.t("quit"))
         self.orb_quit_button.setAccessibleName(self.t("quit"))
         self.checks["cache"].setToolTip(self.t("cache_hint"))
+        self.checks["session_cache"].setToolTip(self.t("session_cache_hint"))
+        self.checks["message_buttons"].setToolTip(self.t("buttons_hint"))
+        self.buttons_hint.setText(self.t("buttons_hint"))
+        self.buttons_hint.setVisible(self.settings.manual_reader)
         self.clear_button.setToolTip(self.t("inbox_hint"))
         for key, combo in self.selects.items():
             combo.blockSignals(True)
@@ -786,12 +844,15 @@ class Companion(QWidget):
             field = {"start": "desktop_auto_start", "pin": "always_on_top",
                      "follow": "follow_codex"}.get(key, key)
             box.blockSignals(True)
-            box.setChecked(getattr(self.settings, field))
+            box.setChecked(self.settings.cache_lifetime == "session" if key == "session_cache"
+                           else getattr(self.settings, field))
             box.setText(self.t(key))
             box.blockSignals(False)
         for control in (self.selects["response_scope"], self.checks["translate_questions"]):
-            control.setEnabled(self.settings.workflow == "chat")
+            control.setEnabled(self.settings.workflow == "chat" and not self.settings.manual_reader)
             control.setToolTip(self.t("chat_hint"))
+        self.checks["message_buttons"].setEnabled(self.settings.floating_chat)
+        self.checks["session_cache"].setEnabled(self.settings.cache)
         self.checks["follow"].setEnabled(
             self.settings.workflow == "desktop" or self.settings.floating_chat)
         self.update_status()
@@ -824,6 +885,8 @@ class Companion(QWidget):
                 ui_language=self.selects["ui"].currentData(),
                 enabled=self.checks["enabled"].isChecked(),
                 cache=self.checks["cache"].isChecked(),
+                cache_lifetime="session" if self.checks["session_cache"].isChecked() else "disk",
+                message_buttons=self.checks["message_buttons"].isChecked(),
                 desktop_auto_start=self.checks["start"].isChecked(),
                 always_on_top=self.checks["pin"].isChecked(),
                 follow_codex=self.checks["follow"].isChecked(),
@@ -851,14 +914,20 @@ class Companion(QWidget):
             self.follower.failed = False
             if self.settings.follow_codex:
                 self.orb.show()
-        if (previous.source, previous.target, previous.cache, previous.provider) != (
+        if (previous.source, previous.target, previous.cache, previous.provider,
+                previous.cache_lifetime, previous.manual_reader) != (
             self.settings.source,
             self.settings.target,
             self.settings.cache,
             self.settings.provider,
+            self.settings.cache_lifetime,
+            self.settings.manual_reader,
         ):
-            self.translate_current()
+            self.translate_current(show_translation=False if self.settings.manual_reader else None)
         elif previous.mode != self.settings.mode:
+            if self.settings.manual_reader:
+                self.translate_current(show_translation=False)
+                return
             self.show_translation = self.settings.mode != "original"
             if self.settings.mode == "original":
                 self.revision += 1
@@ -937,7 +1006,8 @@ class Companion(QWidget):
             self.orb.hide()
         self.show()
         self.raise_()
-        if self.settings.follow_codex and self.text and not self.last_result:
+        if (self.settings.follow_codex and not self.settings.manual_reader
+                and self.text and not self.last_result):
             self.translate_current()
         self.update_orb_label()
         self.follower.tick()
@@ -966,7 +1036,7 @@ class Companion(QWidget):
 
     def clear_cache(self):
         try:
-            Cache().clear()
+            self.inbox.clear_translations()
             self.status.setText(self.t("cache_cleared"))
         except (OSError, sqlite3.Error) as exc:
             self.status.setText(str(exc))
@@ -977,6 +1047,10 @@ class Companion(QWidget):
         self.quitting = True
         self.timer.stop()
         self.follower.close()
+        if self.message_adapter:
+            self.message_adapter.close()
+            self.message_adapter = None
+        Cache(memory=True).clear()
         self.cancel_translation()
         self.hide()
         self.orb.hide()
@@ -1005,15 +1079,77 @@ class Companion(QWidget):
         self.sessions.setCurrentIndex(-1)
         self.sessions.setPlaceholderText(self.t("manual"))
         self.sessions.blockSignals(False)
+        self.message_feedback("original")
+        self.message_request = None
         self.text = text
         self.reply_id = None
-        self.translate_current()
+        self.translate_current(show_translation=True if self.settings.manual_reader else None)
 
     def select_reply(self, index):
         if index >= 0 and index < len(self.rows):
+            self.message_feedback("original")
+            self.message_request = None
             self.text = self.rows[index]["text"]
             self.reply_id = self.rows[index]["id"] if self.settings.floating_chat else None
-            self.translate_current()
+            self.translate_current(show_translation=False if self.settings.manual_reader else None)
+
+    def message_feedback(self, state):
+        if self.message_adapter and self.message_request:
+            self.message_adapter.feedback(self.message_request, state)
+
+    def cancel_message(self):
+        if self.message_request:
+            self.message_feedback("original")
+            self.message_request = None
+            self.revision += 1
+            self.cancel_translation()
+            self.show_translation = False
+            self.reader.setMarkdown(self.text)
+            self.toggle_button.setText(self.t("translate"))
+            self.status_key = "ready" if self.text else "waiting"
+            self.update_status()
+
+    def poll_messages(self):
+        active = self.settings.manual_reader and self.settings.enabled
+        language = self.settings.ui_language
+        if language == "auto":
+            language = self.settings.host_locale
+        if language == "auto":
+            language = QLocale.system().name().split("_")[0]
+        if self.message_adapter and (not active or self.message_adapter.language != language):
+            self.cancel_message()
+            self.message_adapter.close()
+            self.message_adapter = None
+            self.message_request = None
+        if active and self.message_adapter is None:
+            self.message_adapter = MessageAdapter(language)
+        if not self.message_adapter:
+            return
+        self.buttons_hint.setText(self.t("buttons_hint") + "\n"
+                                  + self.t(self.message_adapter.status))
+        while True:
+            try:
+                request = self.message_adapter.events.get_nowait()
+            except queue.Empty:
+                break
+            if request["action"] == "reset":
+                self.cancel_message()
+                continue
+            self.message_feedback("original")
+            self.message_request = {key: request[key] for key in ("document", "request")}
+            self.inbox.publish({
+                "hook_event_name": "Stop", "last_assistant_message": request["text"],
+                "session_id": request["session"], "turn_id": request["message"],
+            }, archive=True)
+            row = next(row for row in self.inbox.history()
+                       if row["session"] == request["session"] and row["turn"] == request["message"]
+                       and row["text"] == request["text"])
+            self.reply_id, self.text = row["id"], row["text"]
+            self.ids = ()
+            self.expand()
+            self.translate_current(show_translation=request["action"] == "translate")
+            if request["action"] == "original" or self.last_result:
+                self.message_feedback("ready" if self.show_translation else "original")
 
     def translate_current(self, show_translation=None):
         self.revision += 1
@@ -1025,6 +1161,8 @@ class Companion(QWidget):
         self.toggle_button.setText(self.t("original" if self.show_translation else "translate"))
         self.copy_button.setEnabled(bool(self.text))
         self.reader.setMarkdown(self.text or self.t("empty"))
+        if not self.show_translation:
+            self.message_feedback("original")
         self.pending_translation = (
             self.reply_id, self.settings.provider, self.settings.source, self.settings.target,
         )
@@ -1073,6 +1211,7 @@ class Companion(QWidget):
         else:
             self.translate_current(show_translation=True)
         self.toggle_button.setText(self.t("original" if self.show_translation else "translate"))
+        self.message_feedback("ready" if self.show_translation else "original")
 
     def copy(self):
         text = (display_text(self.last_result, self.reader_mode())
@@ -1080,6 +1219,8 @@ class Companion(QWidget):
         QApplication.clipboard().setText(text)
 
     def clear(self):
+        self.message_feedback("original")
+        self.message_request = None
         self.inbox.clear()
         self.revision += 1
         self.cancel_translation()
@@ -1105,6 +1246,7 @@ class Companion(QWidget):
                 self.settings_changed(previous)
                 if self.quitting:
                     return
+            self.poll_messages()
             activation = self.inbox.activation()
             if activation != self.activation:
                 self.activation = activation
@@ -1124,8 +1266,9 @@ class Companion(QWidget):
                         created = datetime.fromtimestamp(row["created"]).strftime("%m-%d %H:%M")
                         label += " · " + created + " · " + row["text"].splitlines()[0][:40]
                     self.sessions.addItem(label, row["id"])
-                self.sessions.blockSignals(False)
-                if rows:
+                if self.settings.manual_reader:
+                    self.sessions.setCurrentIndex(self.sessions.findData(self.reply_id))
+                elif rows:
                     self.select_reply(0)
                     if self.orb.isVisible():
                         self.orb_button.setText(
@@ -1135,6 +1278,7 @@ class Companion(QWidget):
                     self.text = ""
                     self.reply_id = None
                     self.translate_current()
+                self.sessions.blockSignals(False)
             while True:
                 try:
                     revision, result, error = self.translator.results.get_nowait()
@@ -1143,11 +1287,13 @@ class Companion(QWidget):
                 if revision != self.revision:
                     continue
                 if error:
+                    self.message_feedback("error")
                     self.show_translation = False
                     self.toggle_button.setText(self.t("translate"))
                     self.status_key = "error"
                     self.status.setText(self.t("error") + ": " + error)
                 else:
+                    self.message_feedback("ready")
                     self.last_result = result
                     if self.pending_translation and self.pending_translation[0] is not None:
                         self.inbox.save_translation(*self.pending_translation, result)
