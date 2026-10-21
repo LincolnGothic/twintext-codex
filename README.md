@@ -10,7 +10,7 @@ host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 Google Free (experimental) is an optional keyless online provider. Offline remains the default.
 
-[Download 0.9.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.9.0) ·
+[Download 0.9.1](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.9.1) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
@@ -22,7 +22,7 @@ Google Free (experimental) is an optional keyless online provider. Offline remai
 | **Desktop** | Completed replies in a separate floating window, with a compact draggable button | Automatic translation makes no additional LLM requests and returns no translations to model context |
 
 Chat preserves the original **0.1** experience; Desktop preserves the **0.2.2**
-experience. Version **0.9.0** maintains both through a shared translation engine,
+experience. Version **0.9.1** maintains both through a shared translation engine,
 Markdown parser, language packs and settings. The old releases are historical
 versions; new fixes apply to both styles in the current version.
 
@@ -99,8 +99,12 @@ unchanged. Scrolling and message discovery do not translate.
    fragment and full reader-result caches then live only in memory. Exiting
    TwinText or shutting down releases them; settings, models and original reply
    history remain on disk.
-4. Exit Codex normally, then run **Open Codex with TwinText.cmd** from the TwinText
-   installation folder. The launcher refuses to close an existing app or chat.
+4. Exit Codex and the shared ChatGPT app normally, including any background/tray
+   instance, then run **Open Codex with TwinText.cmd** from the TwinText installation
+   folder in File Explorer. The launcher refuses to close an existing app or chat.
+   Closing just a window can leave the shared app running. If the terminal says
+   **Press any key**, read the error above it: pressing a key only closes the error
+   window. See [launcher troubleshooting](docs/troubleshooting.md#the-codex-launcher-stops-at-press-any-key).
 5. Open an old completed reply and click **Translate** (Chinese: **译**). The reader
    also keeps its own **Translate / Original** toggle and **Copy original**.
 
@@ -117,7 +121,10 @@ The launcher opens debugging on **127.0.0.1:9223**. Other processes on this comp
 may access that debugging endpoint; do not forward it to a network or add broad
 remote-origin flags. TwinText rejects external/redirected endpoints, bypasses
 proxies for this loopback connection, and requires exactly one supported main
-window. Keep one Codex window open for this mode. If Codex rejects the launch flags
+window. Keep one Codex window open for this mode. Version 0.9.1 launches the shared
+`ChatGPT.exe` directly when present, bypassing the `Codex.exe` activation stub, and
+waits up to 20 seconds for the debugging port before reporting startup success.
+If Codex rejects the launch flags
 or changes its renderer, manual Paste remains available. No Codex files are patched.
 Exit Codex and launch it normally to stop debugging. Provider policies still apply.
 Button translation makes no LLM calls or translated-context additions.
@@ -234,8 +241,8 @@ Choose your operating system and preferred first-install style:
 
 | Operating system | Chat default | Floating-window default | Checksums |
 | --- | --- | --- | --- |
-| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.0/TwinText-0.9.0-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.0/TwinText-0.9.0-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.0/SHA256SUMS-linux.txt) |
-| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.0/TwinText-0.9.0-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.0/TwinText-0.9.0-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.0/SHA256SUMS-windows.txt) |
+| Linux | [Linux Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.1/TwinText-0.9.1-linux-chat.zip) | [Linux Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.1/TwinText-0.9.1-linux-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.1/SHA256SUMS-linux.txt) |
+| Windows | [Windows Chat ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.1/TwinText-0.9.1-windows-chat.zip) | [Windows Desktop ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.1/TwinText-0.9.1-windows-desktop.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.9.1/SHA256SUMS-windows.txt) |
 
 Each ZIP supports **both** styles. Install one package, then switch in settings.
 Check its SHA-256 hash against the matching checksum file before installation.

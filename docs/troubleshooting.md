@@ -74,6 +74,24 @@ Wayland/compositor policy can ignore placement or always-on-top hints. If XWayla
 is available, try `QT_QPA_PLATFORM=xcb twintext desktop`. Actual movement uses Qt's
 system-move request; behavior depends on the desktop/window manager.
 
+## The Codex launcher stops at "Press any key"
+
+That prompt follows an error; pressing a key closes the terminal instead of
+continuing startup. Read the TwinText error above it.
+
+If it says Codex is running, exit both Codex and its shared ChatGPT app normally,
+including any background/tray instance, before double-clicking **Open Codex with
+TwinText.cmd** in File Explorer. Closing a chat window alone can leave the app
+running. TwinText never closes active chats or kills app processes for you.
+
+Upgrade to **0.9.1** if using the shared Windows app. Version 0.9.0 selected its
+`Codex.exe` activation stub, which does not forward debugging arguments. Version
+0.9.1 selects `ChatGPT.exe` when present and keeps `Codex.exe` for older packages.
+It checks for the loopback debugging port before opening TwinText. If startup
+exits or that port does not open within 20 seconds, an error is reported and any
+opened Codex process is left alone. Native message-button compatibility still
+needs a real launch/click test; the automated tests use controlled fixtures.
+
 ## The compact button is hard to move
 
 Use its visible six-dot grip, or deliberately drag the TwinText button itself.
