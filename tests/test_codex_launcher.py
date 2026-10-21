@@ -1,3 +1,4 @@
+import io
 import os
 import subprocess
 import sys
@@ -6,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from twintext.cli import main, parser
 from twintext.codex_launcher import launch, windows_app
 from twintext.config import TwinTextError, update_settings
 
@@ -18,6 +20,9 @@ class LauncherTests(unittest.TestCase):
         env = patch.dict(os.environ, TWINTEXT_HOME=folder.name)
         env.start()
         self.addCleanup(env.stop)
+        output = patch("sys.stderr", new_callable=io.StringIO)
+        output.start()
+        self.addCleanup(output.stop)
         self.executable = self.folder / "Codex.exe"
         self.executable.write_bytes(b"fixture")
         self.process = Mock()
@@ -71,6 +76,58 @@ class LauncherTests(unittest.TestCase):
             with self.assertRaisesRegex(TwinTextError, "Exit Codex"):
                 launch()
             spawn.assert_not_called()
+
+    def test_failure_is_recorded_locally_after_terminal_dismissal(self):
+        with (patch("twintext.codex_launcher.sys.platform", "win32"),
+              patch("twintext.codex_launcher.windows_app", return_value=(self.executable, True)),
+              patch("sys.stderr", new_callable=io.StringIO)):
+            with self.assertRaisesRegex(TwinTextError, "Exit Codex"):
+                launch()
+        log = self.folder / "desktop/launcher.log"
+        self.assertTrue(log.is_file(), "The terminal error must remain available after dismissal")
+        self.assertIn("Exit Codex", log.read_text(encoding="utf-8"))
+
+    def test_wait_option_is_explicit_in_cli(self):
+        self.assertTrue(parser().parse_args(["codex-launch", "--wait"]).wait)
+        self.assertFalse(parser().parse_args(["codex-launch"]).wait)
+
+    def test_waiting_launcher_continues_only_after_user_exits_shared_app(self):
+        newer = self.folder / "ChatGPT.exe"
+        newer.write_bytes(b"fixture")
+        with (patch("twintext.codex_launcher.sys.platform", "win32"),
+              patch("twintext.codex_launcher.windows_app", side_effect=[
+                  (self.executable, True), (self.executable, True), (newer, False)]),
+              patch("twintext.codex_launcher.check_port"),
+              patch("twintext.codex_launcher.subprocess.Popen", return_value=self.process) as spawn,
+              patch("socket.create_connection"),
+              patch("time.sleep") as sleep,
+              patch("sys.stderr", new_callable=io.StringIO) as output,
+              patch("twintext.codex_launcher.launch_desktop") as reader):
+
+            def keep_app_running(_seconds):
+                spawn.assert_not_called()
+                reader.assert_not_called()
+
+            sleep.side_effect = keep_app_running
+            self.assertTrue(launch(wait=True)["launched"])
+            self.assertEqual(spawn.call_args.args[0][0], str(newer))
+            self.assertEqual(sleep.call_count, 2)
+            self.assertIn("Waiting", output.getvalue())
+            self.assertIn("Ctrl+C", output.getvalue())
+            reader.assert_called_once_with()
+
+    def test_cancelling_wait_does_not_start_or_stop_apps(self):
+        with (patch("twintext.codex_launcher.sys.platform", "win32"),
+              patch("twintext.codex_launcher.windows_app", return_value=(self.executable, True)),
+              patch("twintext.codex_launcher.subprocess.Popen") as spawn,
+              patch("time.sleep", side_effect=KeyboardInterrupt),
+              patch("sys.stderr", new_callable=io.StringIO),
+              patch("twintext.codex_launcher.launch_desktop") as reader):
+            self.assertEqual(main(["codex-launch", "--wait"]), 130)
+            spawn.assert_not_called()
+            reader.assert_not_called()
+        self.assertIn("cancelled", (self.folder / "desktop/launcher.log").read_text(
+            encoding="utf-8").lower())
 
     def test_launcher_uses_loopback_debugging_and_opens_existing_reader(self):
         with (patch("twintext.codex_launcher.sys.platform", "win32"),

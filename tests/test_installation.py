@@ -45,6 +45,23 @@ class InstallationTests(unittest.TestCase):
         ):
             runpy.run_path(str(ROOT / "scripts/register-plugin.py"), run_name="__main__")
 
+    def test_windows_launcher_waits_and_cancellation_does_not_pause(self):
+        app = self.home / "TwinText %test%"
+        app.mkdir()
+        install = runpy.run_path(str(ROOT / "scripts/install.py"))
+        with (patch.dict(os.environ, APPDATA=str(self.home / "appdata")),
+              patch("subprocess.run")):
+            install["windows_launchers"](app)
+        batch = (app / "Open Codex with TwinText.cmd").read_bytes()
+        interpreter = self.home / "TwinText %%test%%/venv/Scripts/python.exe"
+        self.assertEqual(batch.split(b"\r\n"), [
+            b"@echo off",
+            f'"{interpreter}" -m twintext.cli codex-launch --wait'.encode(),
+            b"if errorlevel 130 exit /b 130",
+            b"if errorlevel 1 pause",
+            b"",
+        ])
+
     def test_registration_preserves_marketplace_and_other_plugins(self):
         other = {"name": "existing", "source": {"source": "local", "path": "./existing"}}
         self.marketplace.write_text(json.dumps({"name": "personal", "plugins": [other]}))

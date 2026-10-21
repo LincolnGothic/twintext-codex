@@ -5,10 +5,12 @@ import socket
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+from twintext import __version__
 from twintext.bridge import launch_desktop
-from twintext.config import TwinTextError, load_settings
+from twintext.config import TwinTextError, data_dir, load_settings, private_dir
 from twintext.message_adapter import PORT
 
 
@@ -74,11 +76,32 @@ def wait_for_debugging(process):
     )
 
 
-def launch():
+def launch(wait=False):
     if sys.platform != "win32":
         raise TwinTextError(
             "The experimental per-message launcher currently supports Windows only."
         )
+    path = private_dir(data_dir() / "desktop") / "launcher.log"
+    with path.open("a", encoding="utf-8") as log:
+        path.chmod(0o600)
+        log.write(f"\n{datetime.now(timezone.utc).isoformat()} TwinText {__version__}\n")
+
+        def report(message):
+            print(message, file=sys.stderr, flush=True)
+            print(message, file=log, flush=True)
+
+        report(f"Startup log: {path.resolve()}")
+        try:
+            return _launch(wait, report)
+        except KeyboardInterrupt:
+            report("Launcher cancelled. No running app was closed.")
+            raise
+        except (TwinTextError, OSError, ValueError, RuntimeError) as exc:
+            report(f"Startup failed: {exc}")
+            raise
+
+
+def _launch(wait, report):
     settings = load_settings()
     if not settings.manual_reader or not settings.enabled:
         raise TwinTextError(
@@ -86,13 +109,23 @@ def launch():
             "and Per-reply Translate buttons first."
         )
     executable, running = windows_app()
-    if running:
+    if running and not wait:
         raise TwinTextError(
             "Exit Codex and its shared ChatGPT app, including any background/tray instance, "
             "then run this launcher again. Pressing a key only closes this error window. "
             "TwinText will not close an active conversation."
         )
+    if running:
+        report(
+            "Waiting for Codex/ChatGPT to exit normally. Leave this terminal open, "
+            "then choose Quit/Exit in Codex and the shared ChatGPT app, including its tray icon. "
+            "Startup continues automatically after the app exits. Press Ctrl+C to cancel."
+        )
+        while running:
+            time.sleep(2)
+            executable, running = windows_app()
     check_port()
+    report(f"Starting: {executable}")
     process = subprocess.Popen(
         [str(executable), "--remote-debugging-address=127.0.0.1",
          f"--remote-debugging-port={PORT}"],
@@ -101,5 +134,7 @@ def launch():
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     wait_for_debugging(process)
+    report(f"Debugging port ready: 127.0.0.1:{PORT}")
     launch_desktop()
+    report("TwinText reader launch requested.")
     return {"launched": True, "experimental": True, "port": PORT}

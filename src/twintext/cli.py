@@ -76,7 +76,12 @@ def parser():
     commands.add_parser("capture", help="Receive a Codex Stop event on stdin (no model calls)")
     desktop = commands.add_parser("desktop", help="Open the floating desktop reader")
     desktop.add_argument("--background", action="store_true", help="Start as a compact button")
-    commands.add_parser("codex-launch", help="Launch Windows Codex with optional message buttons")
+    launcher = commands.add_parser(
+        "codex-launch", help="Launch Windows Codex with optional message buttons"
+    )
+    launcher.add_argument(
+        "--wait", action="store_true", help="Wait for the existing app to exit normally"
+    )
     ui = commands.add_parser("ui", help="Open the settings page on localhost")
     ui.add_argument("--port", type=int, default=0)
     ui.add_argument("--open", action="store_true", dest="open_browser")
@@ -115,7 +120,7 @@ def main(argv=None):
         elif args.command == "codex-launch":
             from twintext.codex_launcher import launch
 
-            print(json.dumps(launch()))
+            print(json.dumps(launch(wait=args.wait)))
         elif args.command == "translate":
             text = (
                 Path(args.file).read_text(encoding="utf-8")
