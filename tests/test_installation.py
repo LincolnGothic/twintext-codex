@@ -21,9 +21,9 @@ class InstallationTests(unittest.TestCase):
         self.assertFalse((plugin / "plugin.json").exists())
         manifest = json.loads((plugin / ".codex-plugin/plugin.json").read_text())
         hooks = json.loads((plugin / manifest["hooks"]).read_text())
-        self.assertEqual(set(hooks["hooks"]), {"SessionStart", "UserPromptSubmit", "Stop"})
-        command = hooks["hooks"]["Stop"][0]["hooks"][0]["command"]
-        self.assertIn("${PLUGIN_ROOT}/hooks/capture.py", command)
+        self.assertEqual(set(hooks["hooks"]), {"SessionStart", "UserPromptSubmit"})
+        command = hooks["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+        self.assertIn("${PLUGIN_ROOT}/hooks/context.py", command)
         mcp = json.loads((plugin / manifest["mcpServers"]).read_text())
         self.assertIn("twintext", mcp["mcpServers"])
         self.assertTrue((plugin / manifest["skills"]).is_dir())
@@ -131,9 +131,9 @@ class InstallationTests(unittest.TestCase):
                 )
                 return json.loads(result.stdout)
 
-            self.assertEqual(invoke(), {})
+            self.assertIn("manual per-message", invoke()["hookSpecificOutput"]["additionalContext"])
             update_settings(enabled=False)
-            self.assertEqual(invoke(), {})
+            self.assertIn("manual per-message", invoke()["hookSpecificOutput"]["additionalContext"])
 
 
 if __name__ == "__main__":

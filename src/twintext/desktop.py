@@ -34,7 +34,6 @@ from twintext.config import (
     LANGUAGES,
     MODES,
     PROVIDERS,
-    RESPONSE_SCOPES,
     TRANSLATION_LANGUAGES,
     TwinTextError,
     load_settings,
@@ -68,7 +67,7 @@ WORDS = {
         "bilingual": "Bilingual",
         "translated": "Translation only",
         "original": "Original",
-        "enabled": "Receive Codex replies",
+        "enabled": "Enable Translate buttons",
         "cache": "Remember translations locally",
         "start": "Open floating button on new replies",
         "pin": "Keep above other windows",
@@ -115,7 +114,7 @@ WORDS = {
         "bilingual": "双语对照",
         "translated": "仅译文",
         "original": "原文",
-        "enabled": "接收 Codex 回复",
+        "enabled": "启用 Translate 按钮",
         "cache": "在本机保存翻译缓存",
         "start": "收到新回复时打开浮动按钮",
         "pin": "保持窗口置顶",
@@ -161,7 +160,7 @@ WORDS = {
         "bilingual": "二言語表示",
         "translated": "訳文のみ",
         "original": "原文",
-        "enabled": "Codex の返信を受信",
+        "enabled": "Translate ボタンを有効化",
         "cache": "翻訳をローカルに保存",
         "start": "新しい返信でフローティングボタンを開く",
         "pin": "最前面に表示",
@@ -207,7 +206,7 @@ WORDS = {
         "bilingual": "Bilingue",
         "translated": "Traduction seule",
         "original": "Original",
-        "enabled": "Recevoir les réponses de Codex",
+        "enabled": "Activer les boutons Translate",
         "cache": "Mémoriser les traductions localement",
         "start": "Ouvrir le bouton flottant à chaque nouvelle réponse",
         "pin": "Garder au premier plan",
@@ -257,7 +256,7 @@ WORDS = {
         "bilingual": "Bilingüe",
         "translated": "Solo traducción",
         "original": "Original",
-        "enabled": "Recibir respuestas de Codex",
+        "enabled": "Activar los botones Translate",
         "cache": "Guardar traducciones localmente",
         "start": "Abrir el botón flotante con nuevas respuestas",
         "pin": "Mantener encima de otras ventanas",
@@ -404,38 +403,42 @@ for _language, _labels in {
 for _language, _labels in {
     "en": ("Per-reply Translate buttons (experimental, manual only)",
            "Only remember translations until TwinText exits",
-           "Requires Floating reader beside Codex and the special Codex launcher. "
-           "Disables automatic translation. Private Codex UI changes may break buttons.",
+           'Click Translate / Original on a completed Codex reply. Windows requires Open '
+           'Codex with TwinText.cmd; Linux uses manual Paste. Codex UI changes may affect '
+           'buttons.',
            "Waiting for Codex. Exit Codex, then use Open Codex with TwinText.cmd.",
            "Connected. Open a completed reply; unsupported layouts show no button.",
            "Session cache covers fragments and reader translations. Existing disk cache "
            "is ignored; Clear cache removes it. Originals and settings are kept."),
     "zh": ("逐条回复翻译按钮（实验性，仅手动翻译）", "仅本次运行缓存译文（退出后释放）",
-           "需选择 Codex 旁浮动阅读器，并使用专用启动器。启用后关闭自动翻译。"
-           "Codex 内部界面变更可能导致按钮失效。",
+           '点击 Codex 已完成回复下的 Translate / Original。Windows 需使用 Open Codex with '
+           'TwinText.cmd；Linux 可手动粘贴。Codex 界面变更可能影响按钮。',
            "等待连接。退出 Codex 后，运行 Open Codex with TwinText.cmd。",
            "已连接。请打开已完成的回复；不兼容的消息布局不会显示按钮。",
            "仅在内存中保存翻译片段和阅读器译文，忽略旧磁盘缓存。"
            "点击“清除缓存”可清除旧译文，保留原文和设置。"),
     "ja": ("返信ごとの翻訳ボタン（試験的・手動のみ）", "TwinText 終了まで訳文を記憶",
-           "Codex 横のリーダーと専用ランチャーが必要です。自動翻訳を停止します。"
-           "Codex の内部 UI 変更により動作しなくなる場合があります。",
+           '完了した返信の Translate / Original をクリック。'
+           'Windows は Open Codex with TwinText.cmd、Linux '
+           'は手動貼り付けを使用します。Codex の UI 変更でボタンに影響する場合があります。',
            "接続待ち。Codex を終了し Open Codex with TwinText.cmd を実行してください。",
            "接続済み。完了した返信を開いてください。非対応の表示にはボタンは出ません。",
            "断片とリーダーの訳文をメモリ内だけに保存。既存のディスクキャッシュは無視し、"
            "キャッシュ消去で削除します。原文と設定は保持します。"),
     "fr": ("Boutons Traduire par réponse (expérimental, manuel)",
            "Garder les traductions jusqu’à la fermeture de TwinText",
-           "Lecteur à côté de Codex et lanceur spécial requis. Désactive la traduction "
-           "automatique. Les changements internes de Codex peuvent casser les boutons.",
+           'Cliquez sur Translate / Original sous une réponse terminée. Windows nécessite '
+           'Open Codex with TwinText.cmd ; Linux utilise le collage manuel. Les changements '
+           'de Codex peuvent affecter les boutons.',
            "En attente. Fermez Codex et lancez Open Codex with TwinText.cmd.",
            "Connecté. Ouvrez une réponse terminée ; les vues non compatibles n’ont pas de bouton.",
            "Fragments et traductions du lecteur en mémoire seulement. Le cache disque est ignoré ; "
            "Effacer le cache le supprime. Originaux et préférences conservés."),
     "es": ("Botones Traducir por respuesta (experimental, manual)",
            "Recordar traducciones solo hasta cerrar TwinText",
-           "Requiere el lector junto a Codex y el lanzador especial. Desactiva la traducción "
-           "automática. Los cambios internos de Codex pueden romper los botones.",
+           'Pulsa Translate / Original bajo una respuesta completa. Windows requiere Open '
+           'Codex with TwinText.cmd; Linux usa pegado manual. Los cambios de Codex pueden '
+           'afectar los botones.',
            "Esperando. Cierra Codex y ejecuta Open Codex with TwinText.cmd.",
            "Conectado. Abre una respuesta completa; las vistas incompatibles no muestran botones.",
            "Fragmentos y traducciones del lector solo en memoria. Se ignora la caché en disco; "
@@ -445,6 +448,19 @@ for _language, _labels in {
         ("message_buttons", "session_cache", "buttons_hint", "buttons_waiting",
          "buttons_connected", "session_cache_hint"), _labels, strict=True,
     )))
+
+
+for _language, _labels in {
+    "en": ("Click Translate below a Codex reply, or paste text here.",
+           "Waiting for your selection"),
+    "zh": ("点击 Codex 回复下的 Translate，或在此粘贴文本。", "等待手动选择"),
+    "ja": ("Codex 返信の Translate をクリックするか、ここに貼り付けてください。",
+           "選択を待っています"),
+    "fr": ("Cliquez sur Translate sous une réponse Codex ou collez du texte ici.",
+           "En attente de votre sélection"),
+    "es": ("Pulsa Translate bajo una respuesta Codex o pega texto aquí.", "Esperando tu selección"),
+}.items():
+    WORDS[_language].update(zip(("empty", "waiting"), _labels, strict=True))
 
 
 def display_text(result, mode):
@@ -579,7 +595,7 @@ class Companion(QWidget):
         self.ids = ()
         self.activation = self.inbox.activation()
         self.status_key = "waiting"
-        self.setWindowTitle("TwinText Desktop")
+        self.setWindowTitle("TwinText Reader")
         self.setMinimumSize(420, 440)
         self.resize(570, 680)
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
@@ -615,8 +631,7 @@ class Companion(QWidget):
         form = QFormLayout(self.preferences)
         self.selects = {}
         self.labels = {}
-        for key in ("provider", "location", "response_scope", "source",
-                    "target", "mode", "ui"):
+        for key in ("provider", "source", "target", "mode", "ui"):
             label = QLabel()
             combo = NoWheelComboBox()
             self.labels[key] = label
@@ -633,8 +648,7 @@ class Companion(QWidget):
         self.google_notice.setObjectName("muted")
         form.insertRow(1, self.google_notice)
         self.checks = {}
-        for key in ("enabled", "message_buttons", "translate_questions", "cache",
-                    "session_cache", "start", "pin", "follow"):
+        for key in ("enabled", "cache", "session_cache", "pin", "follow"):
             box = QCheckBox()
             self.checks[key] = box
             form.addRow(box)
@@ -770,14 +784,13 @@ class Companion(QWidget):
         if not self.preference_scroll.isHidden():
             self.settings_button.setText(self.t("back"))
         self.toggle_button.setText(self.t("original" if self.show_translation else "translate"))
-        if self.settings.floating_chat:
-            self.copy_button.setText(self.t("copy_original"))
-        self.orb_handle.setVisible(not self.button_toggles)
-        self.orb_button.setCheckable(self.button_toggles)
-        self.orb_button.setChecked(self.button_toggles and self.reader_open)
-        self.orb_button.setMinimumSize(36 if self.button_toggles else 116, 36)
-        self.orb_button.setText("T" if self.button_toggles else "TwinText  ↗")
-        self.orb.setFixedSize(84 if self.button_toggles else 196, 48)
+        self.copy_button.setText(self.t("copy_original"))
+        self.orb_handle.hide()
+        self.orb_button.setCheckable(True)
+        self.orb_button.setChecked(self.reader_open)
+        self.orb_button.setMinimumSize(36, 36)
+        self.orb_button.setText("T")
+        self.orb.setFixedSize(84, 48)
         self.follow_hint.setText(self.t("follow_hint"))
         self.checks["follow"].setToolTip(self.t("follow_hint"))
         self.offline.setText(
@@ -811,16 +824,12 @@ class Companion(QWidget):
         self.orb_quit_button.setAccessibleName(self.t("quit"))
         self.checks["cache"].setToolTip(self.t("cache_hint"))
         self.checks["session_cache"].setToolTip(self.t("session_cache_hint"))
-        self.checks["message_buttons"].setToolTip(self.t("buttons_hint"))
         self.buttons_hint.setText(self.t("buttons_hint"))
-        self.buttons_hint.setVisible(self.settings.manual_reader)
         self.clear_button.setToolTip(self.t("inbox_hint"))
         for key, combo in self.selects.items():
             combo.blockSignals(True)
             combo.clear()
             codes = (PROVIDERS if key == "provider"
-                     else ("chat-inline", "chat-floating", "desktop") if key == "location"
-                     else RESPONSE_SCOPES if key == "response_scope"
                      else MODES if key == "mode"
                      else list(TRANSLATION_LANGUAGES) if key in ("source", "target")
                      and self.settings.provider == "google-free" else list(LANGUAGES))
@@ -830,31 +839,21 @@ class Companion(QWidget):
                 label = (self.t("google-free") if code == "google-free" else
                          "Offline — Argos" if code == "offline" else "Microsoft Azure Translator")
                 if key != "provider":
-                    label = self.t("desktop-reader" if key == "location" and code == "desktop"
-                                   else code)
+                    label = self.t(code)
                 combo.addItem(label, code)
             field = "ui_language" if key == "ui" else key
-            value = ("chat-" + self.settings.chat_presentation
-                     if self.settings.workflow == "chat" else "desktop") if key == "location" \
-                else getattr(self.settings, field)
+            value = getattr(self.settings, field)
             combo.setCurrentIndex(combo.findData(value))
             combo.blockSignals(False)
             self.labels[key].setText(self.t(key))
         for key, box in self.checks.items():
-            field = {"start": "desktop_auto_start", "pin": "always_on_top",
-                     "follow": "follow_codex"}.get(key, key)
+            field = {"pin": "always_on_top", "follow": "follow_codex"}.get(key, key)
             box.blockSignals(True)
             box.setChecked(self.settings.cache_lifetime == "session" if key == "session_cache"
                            else getattr(self.settings, field))
             box.setText(self.t(key))
             box.blockSignals(False)
-        for control in (self.selects["response_scope"], self.checks["translate_questions"]):
-            control.setEnabled(self.settings.workflow == "chat" and not self.settings.manual_reader)
-            control.setToolTip(self.t("chat_hint"))
-        self.checks["message_buttons"].setEnabled(self.settings.floating_chat)
         self.checks["session_cache"].setEnabled(self.settings.cache)
-        self.checks["follow"].setEnabled(
-            self.settings.workflow == "desktop" or self.settings.floating_chat)
         self.update_status()
         if not self.text:
             self.reader.setPlainText(self.t("empty"))
@@ -871,14 +870,8 @@ class Companion(QWidget):
     def save_preferences(self):
         previous = self.settings
         try:
-            location = self.selects["location"].currentData()
             self.settings = update_settings(
                 provider=self.selects["provider"].currentData(),
-                workflow="desktop" if location == "desktop" else "chat",
-                chat_presentation=(previous.chat_presentation if location == "desktop"
-                                   else location.removeprefix("chat-")),
-                response_scope=self.selects["response_scope"].currentData(),
-                translate_questions=self.checks["translate_questions"].isChecked(),
                 source=self.selects["source"].currentData(),
                 target=self.selects["target"].currentData(),
                 mode=self.selects["mode"].currentData(),
@@ -886,28 +879,15 @@ class Companion(QWidget):
                 enabled=self.checks["enabled"].isChecked(),
                 cache=self.checks["cache"].isChecked(),
                 cache_lifetime="session" if self.checks["session_cache"].isChecked() else "disk",
-                message_buttons=self.checks["message_buttons"].isChecked(),
-                desktop_auto_start=self.checks["start"].isChecked(),
                 always_on_top=self.checks["pin"].isChecked(),
                 follow_codex=self.checks["follow"].isChecked(),
             )
-            self.settings_changed(previous, keep_settings=not self.preference_scroll.isHidden())
+            self.settings_changed(previous)
         except (TwinTextError, OSError) as exc:
             self.status.setText(str(exc))
 
-    def settings_changed(self, previous, keep_settings=False):
+    def settings_changed(self, previous):
         self.localize()
-        if ((previous.workflow == "desktop" or previous.floating_chat)
-                and self.settings.workflow == "chat" and not self.settings.floating_chat):
-            if keep_settings:
-                self.orb.hide()
-            else:
-                self.quit()
-            return
-        if previous.floating_chat != self.settings.floating_chat:
-            self.ids = ()
-            if self.settings.floating_chat:
-                self.orb.show()
         if (previous.always_on_top, previous.follow_codex) != (
                 self.settings.always_on_top, self.settings.follow_codex):
             self.apply_pin()
@@ -915,37 +895,21 @@ class Companion(QWidget):
             if self.settings.follow_codex:
                 self.orb.show()
         if (previous.source, previous.target, previous.cache, previous.provider,
-                previous.cache_lifetime, previous.manual_reader) != (
+                previous.cache_lifetime) != (
             self.settings.source,
             self.settings.target,
             self.settings.cache,
             self.settings.provider,
             self.settings.cache_lifetime,
-            self.settings.manual_reader,
         ):
-            self.translate_current(show_translation=False if self.settings.manual_reader else None)
+            self.translate_current(show_translation=False)
         elif previous.mode != self.settings.mode:
-            if self.settings.manual_reader:
-                self.translate_current(show_translation=False)
-                return
-            self.show_translation = self.settings.mode != "original"
-            if self.settings.mode == "original":
-                self.revision += 1
-                self.cancel_translation()
-                self.reader.setMarkdown(self.text)
-            elif self.last_result:
-                self.render_result()
-            else:
-                self.translate_current()
-            self.localize()
+            self.translate_current(show_translation=False)
 
     def toggle_settings(self):
         opening = self.preference_scroll.isHidden()
         if opening:
             self.paste_visible = not self.editor.isHidden()
-        elif self.settings.workflow == "chat" and not self.settings.floating_chat:
-            self.quit()
-            return
         self.preference_scroll.setVisible(opening)
         for widget in (self.sessions, self.reader, self.paste_button,
                        self.toggle_button, self.copy_button, self.clear_button):
@@ -979,13 +943,9 @@ class Companion(QWidget):
             if visible:
                 window.show()
 
-    @property
-    def button_toggles(self):
-        return self.settings.floating_chat or self.settings.follow_codex
-
     def update_orb_label(self):
         label = ("hide_translation" if self.reader_open else "show_translation")
-        label = self.t(label if self.button_toggles else "expand")
+        label = self.t(label)
         self.orb_button.setToolTip(label)
         self.orb_button.setAccessibleName(label)
 
@@ -993,39 +953,27 @@ class Companion(QWidget):
         if self.quitting:
             return
         self.reader_open = True
-        if self.button_toggles:
-            self.orb.show()
-            area = self.orb.screen().availableGeometry()
-            self.move(
-                max(area.left(), min(self.orb.x() - self.width() - 12,
-                                     area.right() - self.width() + 1)),
-                max(area.top(), min(self.orb.y(), area.bottom() - self.height() + 1)),
-            )
-            self.orb_button.setChecked(True)
-        else:
-            self.orb.hide()
+        self.orb.show()
+        area = self.orb.screen().availableGeometry()
+        self.move(
+            max(area.left(), min(self.orb.x() - self.width() - 12,
+                                 area.right() - self.width() + 1)),
+            max(area.top(), min(self.orb.y(), area.bottom() - self.height() + 1)),
+        )
+        self.orb_button.setChecked(True)
         self.show()
         self.raise_()
-        if (self.settings.follow_codex and not self.settings.manual_reader
-                and self.text and not self.last_result):
-            self.translate_current()
         self.update_orb_label()
         self.follower.tick()
-        if not self.button_toggles:
-            self.activateWindow()
-            self.orb_button.setText("TwinText  ↗")
 
     def orb_clicked(self):
-        if self.button_toggles and self.reader_open:
+        if self.reader_open:
             self.collapse()
         else:
             self.expand()
 
     def collapse(self):
         if self.quitting:
-            return
-        if self.settings.workflow == "chat" and not self.settings.floating_chat:
-            self.quit()
             return
         self.hide()
         self.reader_open = False
@@ -1083,15 +1031,15 @@ class Companion(QWidget):
         self.message_request = None
         self.text = text
         self.reply_id = None
-        self.translate_current(show_translation=True if self.settings.manual_reader else None)
+        self.translate_current(show_translation=True)
 
     def select_reply(self, index):
         if index >= 0 and index < len(self.rows):
             self.message_feedback("original")
             self.message_request = None
             self.text = self.rows[index]["text"]
-            self.reply_id = self.rows[index]["id"] if self.settings.floating_chat else None
-            self.translate_current(show_translation=False if self.settings.manual_reader else None)
+            self.reply_id = self.rows[index]["id"]
+            self.translate_current(show_translation=False)
 
     def message_feedback(self, state):
         if self.message_adapter and self.message_request:
@@ -1214,9 +1162,7 @@ class Companion(QWidget):
         self.message_feedback("ready" if self.show_translation else "original")
 
     def copy(self):
-        text = (display_text(self.last_result, self.reader_mode())
-                if self.last_result and not self.settings.floating_chat else self.text)
-        QApplication.clipboard().setText(text)
+        QApplication.clipboard().setText(self.text)
 
     def clear(self):
         self.message_feedback("original")
@@ -1254,7 +1200,7 @@ class Companion(QWidget):
                         and self.preference_scroll.isHidden()):
                     self.toggle_settings()
                 self.expand()
-            rows = self.inbox.history() if self.settings.floating_chat else self.inbox.replies()
+            rows = self.inbox.history()
             ids = tuple(row["id"] for row in rows)
             if ids != self.ids:
                 self.rows, self.ids = rows, ids
@@ -1262,22 +1208,10 @@ class Companion(QWidget):
                 self.sessions.clear()
                 for row in rows:
                     label = f"{self.t('codex')} · {row['session'][:12]}"
-                    if self.settings.floating_chat:
-                        created = datetime.fromtimestamp(row["created"]).strftime("%m-%d %H:%M")
-                        label += " · " + created + " · " + row["text"].splitlines()[0][:40]
+                    created = datetime.fromtimestamp(row["created"]).strftime("%m-%d %H:%M")
+                    label += " · " + created + " · " + row["text"].splitlines()[0][:40]
                     self.sessions.addItem(label, row["id"])
-                if self.settings.manual_reader:
-                    self.sessions.setCurrentIndex(self.sessions.findData(self.reply_id))
-                elif rows:
-                    self.select_reply(0)
-                    if self.orb.isVisible():
-                        self.orb_button.setText(
-                            "T" if self.button_toggles else "TwinText  ●"
-                        )
-                else:
-                    self.text = ""
-                    self.reply_id = None
-                    self.translate_current()
+                self.sessions.setCurrentIndex(self.sessions.findData(self.reply_id))
                 self.sessions.blockSignals(False)
             while True:
                 try:
@@ -1336,8 +1270,6 @@ QCheckBox { padding: 2px; }
 
 def run(background=False):
     settings = load_settings()
-    if background and settings.workflow == "chat" and not settings.floating_chat:
-        return 0
     lock = desktop_lock()
     if lock is None:
         if not background:
@@ -1348,7 +1280,7 @@ def run(background=False):
         # Wayland clients cannot position their own windows. Use XWayland when available.
         os.environ["QT_QPA_PLATFORM"] = "xcb"
     app = QApplication.instance() or QApplication([])
-    app.setApplicationName("TwinText Desktop")
+    app.setApplicationName("TwinText Reader")
     app.setDesktopFileName("twintext")
     app.setQuitOnLastWindowClosed(False)
     icon = QPixmap(64, 64)
@@ -1365,13 +1297,11 @@ def run(background=False):
     app.setWindowIcon(QIcon(icon))
     window = Companion()
     try:
-        if window.quitting or (background and window.settings.workflow == "chat"
-                               and not window.settings.floating_chat):
+        if window.quitting:
             return 0
-        if window.settings.floating_chat:
-            area = window.orb.screen().availableGeometry()
-            window.orb.move(area.right() - window.orb.width() - 12,
-                            area.top() + area.height() // 4)
+        area = window.orb.screen().availableGeometry()
+        window.orb.move(area.right() - window.orb.width() - 12,
+                        area.top() + area.height() // 4)
         window.collapse() if background else window.expand()
         return app.exec()
     finally:

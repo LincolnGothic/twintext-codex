@@ -108,10 +108,9 @@ def _launch(wait, report):
     report(f"enabled={settings.enabled}, workflow={settings.workflow}, "
            f"chat_presentation={settings.chat_presentation}, "
            f"message_buttons={settings.message_buttons}")
-    if not settings.manual_reader or not settings.enabled:
+    if not settings.enabled:
         raise TwinTextError(
-            "In TwinText settings choose Floating reader beside Codex, enable translation "
-            "and Per-reply Translate buttons first."
+            "Enable Translate buttons in TwinText settings before starting Codex."
         )
     executable, running = windows_app()
     if running and not wait:

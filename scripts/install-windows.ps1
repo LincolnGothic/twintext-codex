@@ -1,5 +1,4 @@
 param(
-    [ValidateSet('chat', 'desktop')][string]$Workflow,
     [switch]$DownloadModels,
     [switch]$SkipModels,
     [switch]$WithoutEngine,
@@ -8,7 +7,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $taskInstaller = Join-Path $PSScriptRoot 'install.py'
 $taskArguments = @($taskInstaller)
-if ($Workflow) { $taskArguments += @('--workflow', $Workflow) }
 if ($DownloadModels) { $taskArguments += '--download-models' }
 if ($SkipModels) { $taskArguments += '--skip-models' }
 if ($WithoutEngine) { $taskArguments += '--without-engine' }

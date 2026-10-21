@@ -80,8 +80,8 @@ def main():
                 plugin = message["result"]["plugin"]
                 hooks = plugin["hooks"]
                 events = sorted(hook.get("eventName", "").lower() for hook in hooks)
-                if events != ["sessionstart", "stop", "userpromptsubmit"]:
-                    raise RuntimeError(f"Expected Chat and Desktop hooks, found: {hooks}")
+                if events != ["sessionstart", "userpromptsubmit"]:
+                    raise RuntimeError(f"Expected manual-reader context hooks, found: {hooks}")
                 if "twintext" not in plugin["mcpServers"]:
                     raise RuntimeError("Codex did not discover the TwinText MCP server.")
                 print(json.dumps({"hooks": hooks, "mcpServers": plugin["mcpServers"]}))

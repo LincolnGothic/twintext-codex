@@ -90,7 +90,6 @@ def windows_launchers(app):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--workflow", choices=("chat", "desktop"))
     parser.add_argument("--download-models", action="store_true")
     parser.add_argument("--skip-models", action="store_true", help="Keep existing language models")
     parser.add_argument("--without-engine", action="store_true", help="Install UI/tools only")
@@ -141,27 +140,8 @@ def main():
         else:
             print(f"Preserving existing {binary}; use {environment / 'bin/twintext'}.")
         run(str(ROOT / "scripts/register-desktop.py"), str(app))
-    workflow = args.workflow
-    release = ROOT / "release.json"
-    if workflow is None and release.exists():
-        # Packaged style is the first-install default, never an upgrade override.
-        from subprocess import PIPE
-
-        settings = subprocess.run(
-            [
-                str(python),
-                "-c",
-                "from twintext.config import config_dir; "
-                "print((config_dir() / 'settings.json').exists())",
-            ],
-            stdout=PIPE,
-            text=True,
-            check=True,
-        )
-        if settings.stdout.strip() == "False":
-            workflow = json.loads(release.read_text())["workflow"]
-    if workflow is not None:
-        run("-m", "twintext.cli", "settings", "--workflow", workflow)
+    # Persist the manual-only migration while retaining unrelated preferences.
+    run("-c", "from twintext.config import update_settings; update_settings()")
     if args.download_models:
         print("Downloading third-party Argos packages. See THIRD_PARTY_NOTICES.md for licensing.")
         run("-m", "twintext.cli", "models", "install", "--starter")
@@ -169,7 +149,7 @@ def main():
         f"TwinText installed in {app}. "
         "Restart Codex, install/update TwinText, and review its hooks."
     )
-    print("Choose Chat or Floating window in settings. Start a new chat after switching.")
+    print("Use Translate / Original beside a reply, or manual Paste in the reader.")
     if not args.download_models:
         print(
             "Existing models are preserved. Download language models from TwinText's web settings."

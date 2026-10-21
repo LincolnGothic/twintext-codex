@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix="twintext-formats-") as directory:
     (folder / "argos").mkdir()
     (folder / "argos/packages").symlink_to(models)
     with patch.dict(os.environ, {"TWINTEXT_HOME": directory}):
-        update_settings(target="zh", source="en", desktop_auto_start=False, cache=False)
+        update_settings(target="zh", source="en", cache=False)
         service = Service()
         report = []
         parser = MarkdownIt("commonmark").enable("table")
@@ -71,6 +71,8 @@ with tempfile.TemporaryDirectory(prefix="twintext-formats-") as directory:
             if target == "zh":
                 result = value
         app = QApplication([])
+        adapter = patch("twintext.desktop.MessageAdapter", return_value=None)
+        adapter.start()
         window = Companion(
             translator=type(
                 "Worker",
@@ -95,7 +97,9 @@ with tempfile.TemporaryDirectory(prefix="twintext-formats-") as directory:
         window.update_status()
         window.show()
         for mode in ("bilingual", "translated"):
-            window.selects["mode"].setCurrentIndex(window.selects["mode"].findData(mode))
+            window.settings = update_settings(mode=mode)
+            window.show_translation = True
+            window.last_result = result
             window.render_result()
             app.processEvents()
             plain = window.reader.toPlainText()

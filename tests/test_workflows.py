@@ -1,5 +1,4 @@
 import importlib.util
-import io
 import json
 import os
 import shutil
@@ -10,172 +9,22 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from test_bridge import payload
 from test_core import FakeEngine
 from test_markdown_formats import TABLE
 
-from twintext.bridge import Inbox, capture, send_to_reader
-from twintext.config import TwinTextError, config_dir, data_dir, load_settings, update_settings
+from twintext.config import config_dir, data_dir, load_settings, update_settings
 from twintext.locking import acquire_lock
 from twintext.mcp import handle
-from twintext.service import Service, context
+from twintext.service import Service
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_floating_questions_disabled_selects_information_from_final(self):
-        update_settings(workflow="chat", chat_presentation="floating", translate_questions=False)
-        for text in ("Which option?", "The tests passed. Which option?"):
-            capture(io.StringIO(json.dumps(payload(text=text))))
-        self.assertEqual(Inbox().history(), [])
-        self.assertTrue(send_to_reader("The tests passed.", kind="final")["received"])
-        self.assertEqual(Inbox().history()[0]["text"], "The tests passed.")
-        self.assertIn("kind=final", context())
-        self.assertIn("Exclude question passages", context())
 
-    def test_reader_deliveries_deduplicate_retries_but_keep_separate_turns(self):
-        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
-        self.assertTrue(send_to_reader("Checking.", turn_id="first")["received"])
-        self.assertFalse(send_to_reader("Checking.", turn_id="first")["received"])
-        self.assertTrue(send_to_reader("Checking.", turn_id="second")["received"])
-        first = send_to_reader("Checking.")
-        second = send_to_reader("Checking.")
-        self.assertNotEqual(first["turn_id"], second["turn_id"])
-        self.assertEqual(len(Inbox().history()), 4)
-        self.assertIn('turn_id="second"', context("chat", "second"))
-
-    def test_floating_hook_supplies_native_or_generated_turn_id(self):
-        update_settings(workflow="chat", chat_presentation="floating")
-        hook = ROOT / "plugins/twintext/hooks/context.py"
-        with patch.dict(os.environ, {"TWINTEXT_PYTHON": sys.executable}):
-            outputs = []
-            for turn in ("native-turn", None, None):
-                result = subprocess.run(
-                    [sys.executable, str(hook)],
-                    input=json.dumps({"session_id": "chat", "turn_id": turn}),
-                    capture_output=True, text=True, check=True, timeout=10,
-                )
-                outputs.append(json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
-        self.assertIn('turn_id="native-turn"', outputs[0])
-        self.assertIn('turn_id="', outputs[1])
-        self.assertNotEqual(outputs[1], outputs[2])
-
-    def test_floating_chat_preferences_and_context_keep_original_messages(self):
-        self.assertEqual(load_settings().chat_presentation, "inline")
-        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
-        instructions = context()
-        self.assertIn("Keep assistant messages in their original language", instructions)
-        self.assertIn("twintext_send_to_reader", instructions)
-        self.assertIn("progress updates", instructions)
-        self.assertIn("question cards", instructions)
-        self.assertNotIn("present its display verbatim", instructions)
-        update_settings(response_scope="final", translate_questions=False)
-        self.assertIn("Do not forward progress updates", context())
-        self.assertIn("Do not forward questions", context())
-        with self.assertRaises(TwinTextError):
-            update_settings(chat_presentation="invalid")
-        self.assertEqual(load_settings().chat_presentation, "floating")
-
-    def test_floating_stop_archives_original_final_answer_and_launches_button(self):
-        update_settings(workflow="chat", chat_presentation="floating", desktop_auto_start=True)
-        text = "Original English `code`.\n"
-        with patch("twintext.bridge.launch_desktop") as launch:
-            capture(io.StringIO(json.dumps(payload(text=text))))
-            capture(io.StringIO(json.dumps(payload(text=text))))
-            launch.assert_called_once_with(background=True)
-        self.assertEqual(Inbox().history()[0]["text"], text)
-
-    def test_floating_stop_retains_repeated_finals_without_native_turn_id(self):
-        update_settings(workflow="chat", chat_presentation="floating")
-        event = payload(text="The tests passed.")
-        event.pop("turn_id")
-        capture(io.StringIO(json.dumps(event)))
-        capture(io.StringIO(json.dumps(event)))
-        replies = Inbox().history()
-        self.assertEqual(len(replies), 2)
-        self.assertNotEqual(replies[0]["turn"], replies[1]["turn"])
-
-    def test_local_delivery_preserves_original_and_honors_scope_and_questions(self):
-        update_settings(workflow="chat", chat_presentation="floating", response_scope="all")
-        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
-            "name": "twintext_send_to_reader", "arguments": {
-                "text": "Which option?\n- Keep `x`\n- Change `x`", "kind": "question",
-                "session_id": "test-chat",
-            },
-        }}
-        result = handle(request, self.service)["result"]
-        self.assertFalse(result["isError"])
-        self.assertTrue(result["structuredContent"]["received"])
-        self.assertNotIn("译:", json.dumps(result, ensure_ascii=False))
-        self.assertEqual(Inbox().history()[0]["kind"], "question")
-        update_settings(translate_questions=False)
-        self.assertFalse(handle(request, self.service)["result"]["structuredContent"]["received"])
-        request["params"]["arguments"]["kind"] = "progress"
-        self.assertTrue(handle(request, self.service)["result"]["structuredContent"]["received"])
-        update_settings(response_scope="final")
-        self.assertFalse(handle(request, self.service)["result"]["structuredContent"]["received"])
-
-    def test_legacy_settings_default_to_final_answers_and_translated_questions(self):
-        path = self.folder / "settings.json"
-        path.write_text('{"workflow":"chat","target":"zh"}', encoding="utf-8")
-        settings = load_settings()
-        self.assertEqual(settings.response_scope, "final")
-        self.assertTrue(settings.translate_questions)
-        self.assertIn("Leave progress updates untranslated", context())
-        self.assertIn("Translate user-directed questions", context())
-        self.assertIn("request_user_input_async", context())
-        self.assertIn("option labels and descriptions", context())
-        self.assertIn("IDs", context())
-        self.assertIn("schema", context())
-
-    def test_response_scope_and_questions_are_independent(self):
-        update_settings(workflow="chat", response_scope="all", translate_questions=False)
-        self.assertIn("Translate progress updates and final answers", context())
-        self.assertIn("Do not translate user-directed questions", context())
-        self.assertNotIn("Leave progress updates untranslated", context())
-        update_settings(response_scope="final", translate_questions=True)
-        self.assertIn("Leave progress updates untranslated", context())
-        self.assertIn("Translate user-directed questions", context())
-        for changes in ({"enabled": False}, {"enabled": True, "mode": "original"}):
-            update_settings(**changes)
-            self.assertIn("paused", context())
-            self.assertNotIn("Translate user-directed questions", context())
-        update_settings(workflow="desktop", mode="bilingual")
-        self.assertEqual(context(), "")
-
-    def test_invalid_chat_controls_preserve_saved_preferences(self):
-        for changes in ({"response_scope": "wrong"}, {"translate_questions": "false"}):
-            with self.assertRaises(TwinTextError):
-                update_settings(**changes)
-        self.assertEqual(load_settings().response_scope, "final")
-        self.assertTrue(load_settings().translate_questions)
-
-    def test_cli_saves_chat_controls_and_reloads_them(self):
-        result = subprocess.run(
-            [sys.executable, "-m", "twintext.cli", "settings", "--response-scope", "all",
-             "--translate-questions", "false"],
-            capture_output=True, text=True, encoding="utf-8", check=True,
-        )
-        self.assertEqual(json.loads(result.stdout)["response_scope"], "all")
-        self.assertFalse(load_settings().translate_questions)
-
-    def test_mcp_saves_chat_controls_and_rejects_invalid_values(self):
-        def save(arguments):
-            return handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                           "params": {"name": "twintext_set_settings", "arguments": arguments}},
-                          self.service)["result"]
-
-        result = save({"response_scope": "all", "translate_questions": False})
-        self.assertFalse(result["isError"])
-        self.assertEqual(result["structuredContent"]["settings"]["response_scope"], "all")
-        self.assertFalse(result["structuredContent"]["settings"]["translate_questions"])
-        for arguments in ({"response_scope": "wrong"}, {"translate_questions": "true"}):
-            self.assertTrue(save(arguments)["isError"])
-        self.assertEqual(load_settings().response_scope, "all")
 
     @unittest.skipUnless(shutil.which("node"), "Node is required for the settings UI regression")
-    def test_web_chat_controls_restore_save_and_follow_workflow(self):
+    def test_web_manual_settings_restore_and_save_retained_preferences(self):
         subprocess.run([shutil.which("node"), str(ROOT / "tests/test_chat_ui.mjs")],
                        check=True, capture_output=True, timeout=10)
 
@@ -189,25 +38,6 @@ class WorkflowTests(unittest.TestCase):
         self.service = Service(FakeEngine(), lambda _: "en")
         update_settings(target="zh", desktop_auto_start=False, cache=False)
 
-    def test_chat_context_follows_language_mode_and_pause(self):
-        self.assertEqual(context(), "")
-        update_settings(workflow="chat", target="ja", mode="translated")
-        self.assertIn("Japanese", context())
-        self.assertIn("translated", context())
-        self.assertIn("twintext_translate", context())
-        update_settings(enabled=False)
-        self.assertIn("paused", context())
-        update_settings(enabled=True, mode="original")
-        self.assertIn("paused", context())
-        update_settings(workflow="desktop")
-        self.assertEqual(context(), "")
-
-    def test_chat_stop_does_not_store_or_launch(self):
-        update_settings(workflow="chat", desktop_auto_start=True)
-        with patch("twintext.bridge.launch_desktop") as launch:
-            capture(io.StringIO(json.dumps(payload())))
-        launch.assert_not_called()
-        self.assertEqual(Inbox().replies(), [])
 
     def test_cli_preserves_utf8_even_with_legacy_windows_pipe_encoding(self):
         text = "中文 日本語 Français Español\n"
@@ -221,7 +51,7 @@ class WorkflowTests(unittest.TestCase):
         )
         self.assertEqual(result.stdout.decode("utf-8").rstrip("\n"), text.rstrip("\n"))
 
-    def test_same_table_translation_for_chat_mcp_and_desktop_backend(self):
+    def test_same_table_translation_for_explicit_tool_and_reader_backend(self):
         for mode in ("bilingual", "translated"):
             update_settings(workflow="chat", mode=mode)
             request = {
@@ -248,7 +78,7 @@ class WorkflowTests(unittest.TestCase):
             "future_option": {"keep": True},
         }
         path.write_text(json.dumps(old), encoding="utf-8")
-        self.assertEqual(load_settings().workflow, "desktop")
+        self.assertTrue(load_settings().manual_reader)
         update_settings(workflow="chat")
         self.assertEqual(json.loads(path.read_text())["future_option"], {"keep": True})
         self.assertEqual(load_settings().target, "zh")
@@ -262,6 +92,8 @@ class WorkflowTests(unittest.TestCase):
                 {
                     "LOCALAPPDATA": str(self.folder / "Local"),
                     "APPDATA": str(self.folder / "Roaming"),
+                    "TWINTEXT_DATA_DIR": "",
+                    "TWINTEXT_CONFIG_DIR": "",
                 },
             ):
                 os.environ.pop("TWINTEXT_HOME")
@@ -284,26 +116,6 @@ class WorkflowTests(unittest.TestCase):
         result = subprocess.check_output([sys.executable, "-c", script, str(path)], text=True)
         self.assertEqual(result.strip(), "True")
 
-    def test_chat_hooks_return_preferences_only_in_chat_workflow(self):
-        hook = ROOT / "plugins/twintext/hooks/context.py"
-        with patch.dict(os.environ, {"TWINTEXT_PYTHON": sys.executable}):
-            for workflow in ("desktop", "chat"):
-                update_settings(workflow=workflow)
-                for event in ("SessionStart", "UserPromptSubmit"):
-                    result = subprocess.run(
-                        [sys.executable, str(hook)],
-                        input=json.dumps({"hook_event_name": event}),
-                        capture_output=True,
-                        text=True,
-                        check=True,
-                        timeout=10,
-                    )
-                    output = json.loads(result.stdout)
-                    if workflow == "desktop":
-                        self.assertEqual(output, {})
-                    else:
-                        self.assertEqual(output["hookSpecificOutput"]["hookEventName"], event)
-                        self.assertIn("Chinese", output["hookSpecificOutput"]["additionalContext"])
 
     def test_windows_installer_wires_private_python_without_changing_other_plugins(self):
         spec = importlib.util.spec_from_file_location(

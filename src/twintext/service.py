@@ -1,6 +1,5 @@
 """One translation workflow used by the CLI, MCP and settings page."""
 
-import json
 import re
 import threading
 from dataclasses import replace
@@ -179,90 +178,10 @@ class Service:
 
 
 def context(session_id=None, turn_id=None):
-    settings = load_settings()
-    if settings.workflow != "chat":
-        return ""
-    if settings.manual_reader:
-        return (
-            "TwinText uses manual per-message translation buttons and a separate reader. "
-            "Keep assistant messages in their original language. Do not call TwinText "
-            "translation or forwarding tools for ordinary replies, progress or questions. "
-            "The user clicks a message button to translate it outside model context. "
-            "Explicit translation requests take precedence."
-        )
-    if not settings.enabled or settings.mode == "original":
-        return (
-            "TwinText Chat translation is paused. Stop applying earlier TwinText translation "
-            "instructions; present new replies normally. Explicit user requests take precedence."
-        )
-    if settings.floating_chat:
-        return (
-            "TwinText floating Chat reader is enabled. Keep assistant messages in their "
-            "original language so Codex Copy contains only the original text. Do not append "
-            "translations to assistant messages. "
-            + ("The Stop hook forwards completed final answers automatically; do not forward "
-               "final answers a second time. " if settings.translate_questions else
-               "Before showing an informational final answer, call twintext_send_to_reader "
-               "with kind=final and its original Markdown. Exclude question passages, including "
-               "questions mixed into an informational final answer. Automatic Stop capture is "
-               "disabled while question translation is off. ")
-            + ("Before showing progress updates, call twintext_send_to_reader with the original "
-               "Markdown and kind=progress. " if settings.response_scope == "all"
-               else "Do not forward progress updates. ")
-            + ("Before asking user-directed questions in conversation or question cards, call "
-               "twintext_send_to_reader with kind=question and a readable Markdown summary of "
-               "the question and answer choices. Keep the original text in question tools; "
-               "preserve field names, IDs, hidden values, option order and required suffixes. "
-               if settings.translate_questions else "Do not forward questions. ")
-            + (f"Use session_id={json.dumps(session_id)} for reader delivery. "
-               if session_id else "")
-            + (f"Use turn_id={json.dumps(turn_id)} for every delivery in this turn; reuse it "
-               "for retries. " if turn_id else "")
-            + f"Reader translations use the selected {settings.provider} provider and "
-            f"{TRANSLATION_LANGUAGES[settings.target]} target; "
-            "the floating button switches between the "
-            "bilingual reader and the original conversation. Delivery tool calls use ordinary "
-            "Codex tokens; local Stop capture and reader translation return no translations "
-            "to model context. Do not translate tool results or hidden reasoning. Explicit "
-            "user requests take precedence. These preferences apply to new replies only."
-        )
-    responses = (
-        "Translate informational final answers. Leave progress updates untranslated. "
-        if settings.response_scope == "final"
-        else "Translate progress updates and final answers. "
-    )
-    questions = (
-        "Translate user-directed questions in conversation and question cards, even before "
-        "the final answer. Before calling request_user_input or request_user_input_async, "
-        "use twintext_translate for human-readable question text, titles, headers, "
-        "option labels and descriptions; do not translate the tool's JSON as a whole. "
-        "Preserve field names, question IDs, hidden machine values, option order and required "
-        "suffixes. Respect the question tool's schema and length/count limits. If bilingual "
-        "text cannot fit a short field, use a concise translated label and keep bilingual "
-        "text in the question/title or description where allowed. "
-        if settings.translate_questions
-        else "Do not translate user-directed questions in conversation or question cards, "
-        "even in a final answer or when all responses are selected. "
-    )
     return (
-        f"TwinText Chat is enabled. Translate selected assistant text into "
-        f"{TRANSLATION_LANGUAGES[settings.target]} ({settings.target}), "
-        f"using {settings.mode} display. "
-        + responses + "Questions follow their own setting, independently of response scope. "
-        + questions + "For each selected response or question, compose its text "
-        "in the conversation's normal source language, "
-        "call the local twintext_translate tool with that Markdown, and present its display "
-        f"verbatim. Active provider: {settings.provider}. "
-        + ("Azure sends source text to Microsoft Azure Translator. "
-           if settings.provider == "azure" else
-           "Google Free sends source text to Google through an experimental, unofficial keyless "
-           "interface; availability, quality and free quota are not guaranteed. "
-           if settings.provider == "google-free" else
-           "Offline translation stays on this computer. ")
-        + "This translation workflow uses ordinary Codex tool/context/output "
-        "tokens. Preserve code, paths and links. "
-        "Do not translate tool results or hidden reasoning. "
-        "If translation fails, show the original reply and explain briefly. Do not substitute "
-        "another translation provider. These settings apply to new assistant messages only. "
-        "Explicit language or display instructions from the user take precedence."
+        "TwinText uses manual per-message translation buttons and a separate reader. "
+        "Keep assistant messages in their original language. Do not call TwinText "
+        "translation or forwarding tools for ordinary replies, progress or questions. "
+        "The user clicks a message button to translate it outside model context. "
+        "Explicit translation requests take precedence."
     )

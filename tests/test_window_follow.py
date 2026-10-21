@@ -12,7 +12,7 @@ from PySide6.QtCore import QPoint, QRect  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 from test_bridge import payload  # noqa: E402
 from test_core import FakeEngine  # noqa: E402
-from test_desktop import PendingTranslator  # noqa: E402
+from test_desktop import PendingAdapter, PendingTranslator  # noqa: E402
 
 from twintext.bridge import Inbox  # noqa: E402
 from twintext.cli import main  # noqa: E402
@@ -52,6 +52,9 @@ class FollowTests(unittest.TestCase):
         environment = patch.dict(os.environ, TWINTEXT_HOME=folder.name)
         environment.start()
         self.addCleanup(environment.stop)
+        adapter = patch("twintext.desktop.MessageAdapter", PendingAdapter)
+        adapter.start()
+        self.addCleanup(adapter.stop)
         update_settings(target="zh", desktop_auto_start=False)
         self.worker = PendingTranslator()
         self.inbox = Inbox()
@@ -119,12 +122,15 @@ class FollowTests(unittest.TestCase):
         self.window.follower.tick()
         self.assertTrue(self.window.isVisible())
 
-    def test_follow_button_translates_on_first_click_then_reuses_both_modes(self):
-        self.inbox.publish(payload(text="Hello world."))
+    def test_following_reader_translates_only_after_explicit_reply_selection(self):
+        self.inbox.publish(payload(text="Hello world."), archive=True)
         self.window.poll()
         self.assertFalse(self.worker.jobs, "A collapsed attached reader translates on demand")
         self.window.orb_button.click()
         self.assertTrue(self.window.isVisible())
+        self.assertEqual(self.worker.jobs, [])
+        self.window.sessions.setCurrentIndex(0)
+        self.window.toggle_button.click()
         revision, text, source, target = self.worker.jobs[-1]
         result = Service(FakeEngine()).translate(text, source="en", target=target)
         self.worker.results.put((revision, result, None))
@@ -141,6 +147,7 @@ class FollowTests(unittest.TestCase):
         self.assertEqual(settings, load_settings())
         update_settings(mode="translated")
         self.window.poll()
+        self.window.toggle_button.click()
         self.assertTrue(self.window.reader.toPlainText().startswith("译:"))
         self.assertEqual(len(self.worker.jobs), 1)
 

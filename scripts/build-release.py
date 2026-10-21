@@ -25,37 +25,32 @@ def build(platform, output):
         if not any(part == "__pycache__" or part.endswith(".egg-info") for part in path.parts)
         and path.suffix not in (".pyc", ".argosmodel", ".sqlite3")
     )
-    archives = []
-    for workflow in ("chat", "desktop"):
-        name = f"TwinText-{version}-{platform}-{workflow}"
-        destination = output / f"{name}.zip"
-        with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            for path in paths:
-                archive.write(path, f"{name}/{path.relative_to(ROOT).as_posix()}")
-            archive.writestr(
-                f"{name}/release.json",
-                json.dumps(
-                    {
-                        "version": version,
-                        "platform": platform,
-                        "workflow": workflow,
-                        "package": "source-installer",
-                        "models_bundled": False,
-                        "runtime_bundled": False,
-                    },
-                    indent=2,
-                )
-                + "\n",
+    name = f"TwinText-{version}-{platform}"
+    destination = output / f"{name}.zip"
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in paths:
+            archive.write(path, f"{name}/{path.relative_to(ROOT).as_posix()}")
+        archive.writestr(
+            f"{name}/release.json",
+            json.dumps(
+                {
+                    "version": version,
+                    "platform": platform,
+                    "presentation": "manual-reader",
+                    "package": "source-installer",
+                    "models_bundled": False,
+                    "runtime_bundled": False,
+                },
+                indent=2,
             )
-        archives.append(destination)
+            + "\n",
+        )
     checksum = output / f"SHA256SUMS-{platform}.txt"
     checksum.write_text(
-        "".join(
-            f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n" for path in archives
-        ),
+        f"{hashlib.sha256(destination.read_bytes()).hexdigest()}  {destination.name}\n",
         encoding="utf-8",
     )
-    return [*archives, checksum]
+    return [destination, checksum]
 
 
 if __name__ == "__main__":

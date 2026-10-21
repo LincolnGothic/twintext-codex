@@ -1,165 +1,114 @@
-# TwinText 0.3.0 troubleshooting
+# TwinText troubleshooting
 
-Start with a local test: choose source **English**, target **Chinese**, display
-**Bilingual**, paste an English sentence into TwinText and press **Translate**.
-If that succeeds, the engine works and the remaining issue is likely integration
-or window behavior. These steps apply to both Windows and Linux.
+TwinText 0.10.0 uses only per-reply Translate / Original and a separate reader.
+Manual Paste remains the fallback. Inline and automatic Desktop modes are retired.
 
 ## Text stays in its original language
 
-Check the target and source settings. The default target is English; an English
-reply translated into English remains unchanged. **Original** mode also leaves
-text unchanged. Short text can confuse automatic detection, so choose the source
-explicitly for a test. Code, numbers, paths and protected blocks intentionally remain
-unchanged; a fenced code block containing a table is treated as code.
+Set the correct source and target: English → English stays unchanged. Test with
+English → Chinese and Bilingual using a public sentence and Paste → Translate.
+Code, numbers, paths and protected blocks remain original. **Original** in the
+reader hides translation; click **Translate** to show it again. No new reply or
+scroll gesture triggers translation.
 
-Check installed models with `twintext status` or `twintext models list`. On Windows,
-run these commands through `& "$env:LOCALAPPDATA\TwinText\TwinText.cmd"`.
-Models are not downloaded automatically. Request the five-language pack from web
-settings (`twintext ui --open`), or install the required pair:
+Offline needs installed models. Read `twintext status` or `twintext models list`;
+install only when requested with `twintext models install --source en --target zh`
+or the language-pack settings button. Non-English pairs need both English legs.
+Windows uses the runtime's TwinText.cmd for CLI commands. Model downloads are opt-in.
 
-```bash
-twintext models install --source en --target zh
-```
+## The Translate button disappeared
 
-Non-English pairs need both legs of the route through English. Review the
-[model notices](../THIRD_PARTY_NOTICES.md) before requesting downloads.
+The old display selector could close the reader when switching to inline mode.
+Version 0.10.0 removes that selector and the workflow-triggered close path. Older
+profiles migrate to the manual reader; changing provider/language/display/cache
+no longer switches integration methods.
 
-## Local translation works, but Codex replies do not arrive
+1. Check **Enable Translate buttons** in settings. A disabled integration does not
+   show message buttons. Keep the TwinText reader running, even when collapsed.
+2. If Codex was already opened through the dedicated launcher, reopen TwinText with
+   **Open TwinText.cmd**. Its adapter retries the existing local connection.
+3. Otherwise use **Open Codex with TwinText.cmd** as below. A normally launched
+   Codex instance does not automatically have its debugging connection.
+4. Open a completed assistant reply. Unsupported layouts, hidden reasoning, tool
+   results and question cards receive no button. Do not translate another reply
+   as a substitute. Use the reader's manual Paste fallback.
 
-Make sure the TwinText plugin is installed/enabled in the personal Codex marketplace,
-then restart Codex and review/trust its hooks. Rerunning the runtime installer
-registers the plugin but does not automatically install/enable it in Codex or grant
-hook trust. Upgrades can add hooks that require another review.
-
-Check **Translation location** and **Chat presentation**. With **In conversation**,
-Stop capture is inactive, so an empty Desktop inbox is expected. **Floating button
-and reader** archives new Chat replies separately. In **Desktop** mode, enable **Receive Codex replies**.
-Only newly completed replies are captured; previous messages and streaming fragments
-are not imported. Paste/Translate works independently of automatic capture.
-
-On an affected host, use the developer probe `python scripts/check-codex-plugin.py`
-with the repository's Python environment to verify plugin/hook discovery. This
-read-only probe does not grant trust or start a model turn. Discovery alone does
-not prove delivery in an actual chat.
-
-## Chat does not use the translator, or still follows the previous style
-
-Set the translation location to **Chat**, enable translation and choose a target
-that differs from the reply's source. Start a new Codex chat after switching from
-Desktop so SessionStart/UserPromptSubmit supplies the selected workflow's instructions.
-Automatic Chat translation depends on Codex following those instructions and
-calling the available `twintext_translate` tool; it is not a native renderer overlay.
-
-For **Floating button and reader**, new messages stay original in Codex. Final
-answers are captured by Stop; selected progress updates and questions use
-`twintext_send_to_reader` (CLI fallback: `twintext send-to-reader`). Enable **Open
-floating button on new replies** or open the reader manually, then click **T**.
-Click it again to hide translations. Drag the button beside Codex; the reader does
-not attach to or follow the Codex window automatically. Previously received replies
-are available in the reader selector; older conversation messages are not imported.
-
-When switching back to Desktop, start a new chat too. Old Chat instructions can
-remain in an existing conversation even when later Desktop hooks return no context.
-
-## The floating window does not open or stay above Codex
-
-Launch **TwinText Desktop** from your application menu/Start, or run
-`twintext desktop`. If automatic opening is desired, enable **Open floating button
-on new replies**. Repeated launches should activate the existing reader.
-
-On Linux, launch within a graphical session and check Qt's system-library errors.
-Ubuntu/Debian may require the packages documented in [installation](../README.md#linux).
-Wayland/compositor policy can ignore placement or always-on-top hints. If XWayland
-is available, try `QT_QPA_PLATFORM=xcb twintext desktop`. Actual movement uses Qt's
-system-move request; behavior depends on the desktop/window manager.
+The Windows adapter is experimental and depends on private Codex renderer details.
+Keep one main Codex window open. A host update can require an adapter update.
+Linux currently uses manual Paste rather than these message buttons.
 
 ## The Codex launcher stops at "Press any key"
 
-That prompt follows an error; pressing a key closes the terminal instead of
-continuing startup. Read the TwinText error above it.
+Pressing a key only dismisses an error. Read the **Startup failed** line before it.
+Open the runtime's `desktop/launcher.log` after the terminal closes. Logs contain
+startup metadata, interpreter, exact settings path and manual flags, without chat
+text or translation credentials.
 
-Version **0.9.2** changes the Windows launcher to wait instead of failing when the
-shared app is running. Open **Open Codex with TwinText.cmd** first and leave its
-terminal open. When it says **Waiting**, choose Quit/Exit in Codex and its shared
-ChatGPT app, including any background/tray instance. The launcher continues
-automatically after those processes exit. **Ctrl+C** cancels without closing apps.
-It still cannot add debugging options to a running app. Native button labels use
-**Translate / Original** in every language; tooltips retain the interface language.
+Generated CMD files pin the installed data/settings directories. If the path is
+unexpected, rerun the current installer for that installation. Portable `TWINTEXT_HOME`
+still takes priority for ordinary CLI use; the dedicated Codex launcher uses its
+installed profile. Separate `TWINTEXT_DATA_DIR`/`TWINTEXT_CONFIG_DIR` overrides are
+process-local and do not change Windows AppData globally. Preferences are not reset.
 
-Startup stages and errors are saved in `desktop/launcher.log` within TwinText's
-data folder, even after the terminal closes. It contains startup metadata and
-errors, not conversation text or translation credentials. CLI users can run
-`twintext codex-launch --wait`; without `--wait`, an existing app is still an error.
+**Waiting** is different: leave that terminal open, then quit Codex and its shared
+ChatGPT app normally, including tray/background instances. The launcher continues
+only after a normal exit. Ctrl+C cancels; TwinText never kills a conversation.
+Closing a single chat window may leave the shared app running.
 
-If it says to enable floating reader/message buttons but those options are already
-saved, compare the **Settings file** printed by version **0.9.3** with your intended
-profile. Its Windows CMD launchers pin the installation's resolved data/settings
-paths; the dedicated Codex launcher uses that installed profile even if the parent
-shell has an inherited portable override. Ordinary CLI portable `TWINTEXT_HOME`
-behavior is retained. Separate `TWINTEXT_DATA_DIR`/`TWINTEXT_CONFIG_DIR` apply when
-that portable override is absent. These are process-local TwinText overrides;
-Windows AppData and other applications' profiles remain unchanged. No preferences
-are silently enabled or reset. The log also prints enabled/workflow/presentation/
-message-buttons flags without chat text or credentials.
+The launcher selects the installed shared ChatGPT.exe, falling back to legacy
+Codex.exe. It waits up to 20 seconds for debugging on 127.0.0.1:9223 before starting
+the reader. Port conflicts, early exit or host rejection produce errors. Do not
+forward the port to a network or add broad remote-origin flags. Proxy settings are
+bypassed for this loopback connection. No Codex files are patched. Native startup
+and message interaction must still be checked on the actual host version.
 
-If it says Codex is running, exit both Codex and its shared ChatGPT app normally,
-including any background/tray instance, before double-clicking **Open Codex with
-TwinText.cmd** in File Explorer. Closing a chat window alone can leave the app
-running. TwinText never closes active chats or kills app processes for you.
+## Reader, settings, clipboard and window behavior
 
-Upgrade to **0.9.1** if using the shared Windows app. Version 0.9.0 selected its
-`Codex.exe` activation stub, which does not forward debugging arguments. Version
-0.9.1 selects `ChatGPT.exe` when present and keeps `Codex.exe` for older packages.
-It checks for the loopback debugging port before opening TwinText. If startup
-exits or that port does not open within 20 seconds, an error is reported and any
-opened Codex process is left alone. Native message-button compatibility still
-needs a real launch/click test; the automated tests use controlled fixtures.
+Use **Open TwinText.cmd**, `twintext desktop` or the settings panel's Open reader.
+Settings replaces the reading area; Back restores it. Dropdown wheels scroll the
+settings rather than changing selection. Use clicks or keyboard keys.
 
-## The compact button is hard to move
+The compact button toggles the reader; drag **T** deliberately to move it. **−** collapses;
+**×** on either window quits TwinText. Follow/always-on-top depend on the window
+manager. Follow supports Windows and X11/XWayland; native Wayland may require
+manual positioning. When inactive/minimized, an attached window can be hidden.
 
-Use its visible six-dot grip, or deliberately drag the TwinText button itself.
-Click without dragging to expand. The expanded reader's header is also draggable;
-its bottom-right grip resizes it. The reader is movable but does not automatically
-follow the Codex window.
+Paste reads the clipboard only on click. Edit and press Translate. Copy original
+always copies source Markdown, including when bilingual or translated text is shown.
+Original cancels pending translation and keeps source visible. Failed requests
+also keep source visible; no paid or other provider is selected as a fallback.
 
-## The interface language does not match Codex
+## Interface language
 
-Translation target and TwinText interface language are independent. Automatic
-can use a supported Codex locale previously supplied by the embedded settings
-panel. Hooks do not supply that locale; Desktop falls back to the system language,
-and standalone web settings can follow browser language. Choose the interface
-language manually when Automatic cannot determine the language you want.
+Translation and interface languages are independent. Automatic uses available
+host/system locale; choose a language explicitly if it does not match Codex.
+All five interface languages retain English Translate / Original message actions
+and localized explanatory text. No setting changes the Codex app's own language.
 
-## Does translation consume Codex tokens?
+## Tokens, history and caches
 
-Offline Argos/CTranslate2 inference does not consume LLM tokens or require a
-translation API payment. Automatic **Desktop** translation adds no model calls
-or translated text to Codex context. **Chat** instructions, translation tool calls,
-results and final bilingual output use normal Codex tokens; longer replies increase
-the overhead. Asking Codex to configure/open TwinText or manually translate also
-uses normal tokens. No negligible-cost guarantee is made.
+Per-reply buttons and the reader make no LLM calls or translated-context additions.
+Asking Codex to configure/open/explicitly translate text uses normal Codex tokens.
+Existing inline translations in old chats remain there; no transcripts are edited.
 
-## Where are saved records, and when are they deleted?
+Selected originals persist locally in desktop/inbox.sqlite3. Older Desktop retained
+originals are imported without deleting records, preserving timestamps and chronology.
+Cache clearing retains originals/models/settings. **Clear received replies** removes
+received history only when explicitly requested.
 
-See the [local-record paths](../README.md#local-records) for each operating system.
-There is no timed expiry. The translation cache holds up to 10,000 fragments; the
-separate Desktop inbox holds the latest original reply from up to 24 chats.
+Session cache keeps fragments and complete reader translations in process memory
+until TwinText exits, including shutdown. Existing disk translations are ignored;
+no shutdown script is needed. Disk caching has no timed expiry. Turning caching off
+disables reads/writes while preserving existing data. See README for default paths.
 
-Turning off **Remember translations locally** stops cache reads/writes but preserves
-existing entries. It does not stop inbox storage in Desktop mode. **Clear cache**
-deletes cached translations; **Clear received replies** clears the inbox. Each
-control leaves the other store, preferences and models alone. Clearing normally
-completes immediately, and SQLite files may remain after their records are cleared.
+## Google Free (experimental)
 
-## Report a formatting or integration problem
-
-Use the repository's [Issues page](https://github.com/LincolnGothic/twintext-codex/issues).
-Include OS/architecture, Python/Codex/TwinText versions, Chat/Desktop style, language
-pair, display mode, whether Paste/Translate works and a small sanitized Markdown
-example. Describe expected and actual behavior. Avoid posting private replies,
-credentials or your local databases. Formatting coverage is documented
-[here](output-formats.md); model quality is separate from formatting correctness.
+This is an unofficial keyless interface, not Google Cloud Translation. It may
+rate-limit, fail or change; no availability, quality or free quota is guaranteed.
+Source text is sent to Google. System proxies apply to provider requests. A local
+loopback adapter connection bypasses proxies. For network/429 errors, wait and retry
+or explicitly choose another configured provider. Never silently switch providers.
+Google-only Traditional Chinese requires zh-TW; choose zh before Offline/Azure.
 
 ## Azure provider
 
@@ -171,3 +120,10 @@ quota/pricing. For timeout/network errors check connectivity and try shorter tex
 No automatic provider fallback occurs. Offline remains local; screenshots are
 never sent to Azure. Linux credentials need owner-only directory/file permissions
 700/600; protect this unencrypted file and backups. See README for setup/privacy.
+
+## Report a problem
+
+Include OS/architecture and Python/Codex/TwinText versions, sanitized startup error,
+language pair and whether Paste works. Do not post keys, private chat text or local
+databases. Tests use controlled DOM/protocol/Qt fixtures and cannot certify every
+Codex renderer or window manager.

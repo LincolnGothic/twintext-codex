@@ -8,13 +8,10 @@ import threading
 from twintext import __version__
 from twintext.config import (
     CACHE_LIFETIMES,
-    CHAT_PRESENTATIONS,
     LANGUAGES,
     MODES,
     PROVIDERS,
-    RESPONSE_SCOPES,
     TRANSLATION_LANGUAGES,
-    WORKFLOWS,
     TwinTextError,
     update_settings,
 )
@@ -40,7 +37,7 @@ def tools():
                 "readOnlyHint": read_only,
                 "destructiveHint": False,
                 "openWorldHint": name in (
-                    "twintext_install_models", "twintext_translate", "twintext_send_to_reader",
+                    "twintext_install_models", "twintext_translate",
                 ),
             },
         }
@@ -51,7 +48,9 @@ def tools():
     return [
         tool(
             "twintext_translate",
-            "Translate Markdown using the selected provider (Offline, Azure or Google Free). "
+            "Translate explicitly requested text or manual Paste input only. "
+            "Never call for ordinary replies, progress or questions. "
+            "Uses the selected provider (Offline, Azure or Google Free). "
             "Azure sends source text to Microsoft using locally configured credentials. "
             "Google Free sends source text to Google using an experimental keyless interface. "
             "Return bilingual, translated-only, or original display without changing code.",
@@ -65,35 +64,18 @@ def tools():
         ),
         tool("twintext_status", "Read TwinText settings and installed offline models.", {}),
         tool(
-            "twintext_send_to_reader",
-            "Deliver original Markdown to the local floating Chat reader. "
-            "The selected provider translates in the reader; no translation is returned to "
-            "model context. Honors response scope, question and auto-start settings.",
-            {"text": {"type": "string", "maxLength": 100000},
-             "kind": {"type": "string", "enum": ["final", "progress", "question"]},
-             "session_id": {"type": "string", "maxLength": 256},
-             "turn_id": {"type": "string", "maxLength": 256}},
-            required=("text",), read_only=False,
-        ),
-        tool(
             "twintext_set_settings",
             "Save TwinText translation and display preferences.",
             {
                 "provider": {"type": "string", "enum": list(PROVIDERS)},
                 "source": {"type": "string", "enum": ["auto", *TRANSLATION_LANGUAGES]},
-                "workflow": {"type": "string", "enum": list(WORKFLOWS)},
-                "response_scope": {"type": "string", "enum": list(RESPONSE_SCOPES)},
-                "chat_presentation": {"type": "string", "enum": list(CHAT_PRESENTATIONS)},
-                "translate_questions": {"type": "boolean"},
                 "target": LANGUAGE_SCHEMA,
                 "mode": {"type": "string", "enum": list(MODES)},
                 "ui_language": {"type": "string", "enum": ["auto", *LANGUAGES]},
                 "enabled": {"type": "boolean"},
                 "cache": {"type": "boolean"},
                 "cache_lifetime": {"type": "string", "enum": list(CACHE_LIFETIMES)},
-                "message_buttons": {"type": "boolean"},
                 "host_locale": {"type": "string", "enum": ["auto", *LANGUAGES]},
-                "desktop_auto_start": {"type": "boolean"},
                 "always_on_top": {"type": "boolean"},
                 "follow_codex": {"type": "boolean"},
             },
@@ -109,8 +91,8 @@ def tools():
         tool("twintext_clear_cache", "Clear the local translation cache.", {}, read_only=False),
         tool(
             "twintext_open_desktop",
-            "Open the local floating TwinText reader. Completed Codex replies are translated "
-            "in this window by the Stop hook, without returning translations to the model.",
+            "Open the separate manual reader. Per-reply Translate / Original buttons "
+            "or manual Paste select text; scrolling and new replies never translate automatically.",
             {},
             read_only=False,
         ),
@@ -149,10 +131,6 @@ def call_tool(name, arguments, service, cancel=None):
     if name == "twintext_translate":
         return (service.translate(**arguments, cancel=cancel) if cancel is not None
                 else service.translate(**arguments))
-    if name == "twintext_send_to_reader":
-        from twintext.bridge import send_to_reader
-
-        return send_to_reader(**arguments)
     if name == "twintext_open_desktop":
         from twintext.bridge import launch_desktop
 

@@ -1,147 +1,75 @@
 # TwinText architecture
 
-TwinText combines a local translation runtime, a Codex integration plugin and an
-optional Qt floating reader. Chat and Desktop share preferences, language models,
-the Markdown parser and translation cache; `workflow` selects the automatic path.
+## One manual selection path
 
-## Shared runtime
+TwinText is a Python companion with a Qt reader, a local settings/preview UI and
+stdio MCP configuration tools. It supports Offline, Azure and experimental Google
+Free through the shared Markdown translation service. It makes no automatic LLM
+translation requests or changes to Codex transcripts.
 
-The installer creates a private Python environment with Argos Translate,
-CPU CTranslate2/PyTorch and PySide6. Models are downloaded only on request. Eight
-starter packages connect English with Chinese, Japanese, French and Spanish;
-non-English pairs can pivot through English.
+On Windows, codex_launcher.py starts the installed Codex/shared ChatGPT executable
+with loopback debugging after the user exits it normally. It does not kill apps or
+patch packaged resources. CMD launchers retain resolved runtime/settings paths.
+message_adapter.py validates exactly one supported local main-window target and
+installs the runtime message-buttons.js adapter through a bounded protocol session.
+Only app://- default contexts can emit validated, nonce-bound button events. It
+rejects remote/redirected endpoints and bypasses proxies for loopback discovery.
 
-The service identifies translatable Markdown fragments, protects code/paths and
-structural syntax, translates the fragments and reconstructs the display. It
-supports original, bilingual and translated-only views. Both automatic workflows,
-the CLI, settings previews and MCP use this service.
+The renderer adapter walks committed message props and matches a completed visible
+assistant body to its source Markdown and conversation/message IDs. It fails closed
+on unknown layouts. Mutation/recycling causes rescanning; discovery does not translate.
+An explicit Translate/Original click submits that exact source to the reader queue.
+No latest-message or clipboard fallback is used. Actions stay English with localized
+tooltips; Codex text and native copying stay untouched.
 
-A bounded SQLite cache keys fragments by their digest, source/target language and
-model fingerprint. Connections reserve the writer before read/write operations,
-commit or roll back their transaction, and close explicitly on exit. Preferences
-use atomic replacement under a native advisory lock: `fcntl` on Linux and
-`msvcrt` on Windows. Model installation uses the same portable locking layer.
+The reader archives clicked originals in Inbox, displays the exact selection, and
+submits a translation only on the Translate action. Original cancels pending work;
+revision IDs reject stale results. Source stays visible on error. Selecting saved
+history shows source first. Manual Paste provides the other explicit input path,
+including on Linux. Copy original copies exact source Markdown in every view.
 
-## Chat workflow
+## Settings and migration
 
-1. SessionStart/UserPromptSubmit runs the local context hook, which loads the
-   current preferences without reading conversation history.
-2. For an enabled Chat workflow, `response_scope=final` (default) translates
-   informational final answers only; `all` also includes progress updates.
-   `translate_questions=true` (default) independently includes user-directed
-   questions in the conversation and question cards, with their answer choices.
-   The hook asks Codex to call `twintext_translate` for the selected prose and
-   display the returned text in the selected mode. Question payloads retain
-   their IDs, JSON field names, hidden values, option order and schema constraints;
-   short fields use concise translated labels when bilingual text cannot fit.
-   Paused/original mode stops both response and question translation. Tool results
-   and hidden reasoning are excluded. These controls do not change Desktop capture.
-3. The MCP tool translates locally and returns its result to Codex. The displayed
-   translation is part of the selected assistant message or question in the existing chat.
-4. With the default `chat_presentation=inline`, Stop exits without a Desktop capture.
-   With `chat_presentation=floating`, assistant text stays original and Stop archives
-   completed final answers for the separate reader when question translation is enabled.
-   With questions disabled, Stop skips capture and Codex delivers only informational
-   final passages, excluding questions from mixed replies. Selected progress and question
-   summaries reach it through `twintext_send_to_reader`, returning only receipt status.
-   The context hook supplies session and turn IDs (a generated turn ID when absent).
-   Explicit turn IDs deduplicate retries; deliveries without one receive a fresh ID.
-   Floating Stop events without a native turn ID likewise receive a fresh ID;
-   identical finals from separate turns remain in history.
-   Delivery still uses normal tool tokens;
-   reader translations do not enter model context.
+config.py validates settings and atomically persists updates while retaining unknown
+fields. Valid old workflow choices normalize to chat/floating/message-buttons true;
+provider, source/target/UI languages, display, enabled state, cache, pin/follow and
+credentials remain independent. Retired mode fields are compatibility data, absent
+from the native/web controls and public settings/CLI schema.
 
-Floating Chat keeps originals in the inbox's separate `history` table and completed
-translations in `history_translations`, keyed by reply, provider, source and target.
-It does not overwrite earlier received replies or expire them automatically.
-Clearing the ordinary fragment cache leaves this history intact. Selecting a reply
-with no saved translation translates it on demand; completed results are retained.
-The draggable button shows/hides the reader without changing translation preferences
-or re-running inference. Its Copy original returns the exact original Markdown.
+Automatic inline and Desktop workflows have been removed. Context hooks provide
+manual-only instructions. Stop is not registered; capture and forwarding compatibility
+entry points are inert for old registrations. Reader settings never close the reader
+through a workflow change. Opening a reader can reconnect its adapter if the existing
+Codex process already has the expected debugging endpoint.
 
-Local inference does not call a translation LLM, but instructions, tool arguments,
-tool results and displayed output consume normal Codex context/output tokens.
-Automatic translation depends on Codex following the tool instructions; this
-plugin does not patch the native chat renderer or rewrite earlier messages.
+Inbox preserves original history and completed reader results. At initialization,
+retained old Desktop reply rows are inserted idempotently into history with original
+text and timestamps. Existing rows are never replaced. History sorts by created
+then ID, descending, so imported older replies do not displace newer entries.
 
-## Desktop workflow
+## Translation service and storage
 
-1. SessionStart/UserPromptSubmit returns no translation instructions in Desktop mode.
-2. The Stop hook receives a bounded completed-reply payload and forwards it to the
-   private runtime. It returns `{}` without translated text, additional context
-   or a request for another model turn. Errors fail open.
-3. The runtime validates `last_assistant_message` and stores its original Markdown
-   in a local inbox: one latest reply per session, at most 24 sessions. Exact
-   session/turn/text duplicates are ignored; Codex transcripts are not edited.
-4. If auto-start is enabled and no reader is running, capture opens the Qt reader
-   as a compact button. A native lock ensures one reader; explicit repeated
-   launches activate the existing window through the inbox control table.
-5. A Qt timer reads inbox updates. One background worker translates the latest
-   selected request. Revisions prevent stale results from replacing a newer reply
-   or language selection; errors leave the original visible.
-6. The reader displays translated-only or bilingual Markdown outside Codex and
-   copies the same Markdown on request. Display-mode changes reuse a completed
-   translation rather than requesting inference again.
+Service parses Markdown and protects code, paths, link destinations, numbers and math.
+It uses the selected provider only, preserving bilingual/translated/original views.
+The settings UI uses the same explicit translation service for manual preview. Cloud
+failures never select another provider. Azure credentials stay in local protected
+storage, outside normal settings/tool output. Google uses the unofficial fixed
+translate.googleapis.com endpoint, a shared serial lock, encoded-length-aware chunks,
+15-second request timeouts and bounded cancellable retries; no key or free quota is
+promised. Provider/source/target/text identify cached fragments.
 
-This automatic path makes no additional LLM requests and returns no translation
-text to Codex. MCP remains available for manual translation, opening the reader
-and changing settings; those conversational actions use normal Codex tokens.
+Default disk caching retains the existing bounded fragment policy and persisted
+reader results. Session lifetime stores both kinds in bounded process memory and
+ignores old disk translations. Disabling cache stops both reads/writes. Clearing
+translations preserves originals, settings and models; clearing received history
+is separate. Window exit releases session caches and cancels pending translation.
 
-## Integration and platform boundaries
+## Packaging and validation
 
-The compatibility plugin exposes all three hooks and its MCP server. The installer
-removes the obsolete portable root manifest that hid hooks in the tested loader.
-Hook review/trust remains a host/user decision. Switching workflows needs a new
-Codex chat to discard prior translation instructions already in context.
-
-Linux uses XDG data/config paths and an application-menu launcher. Windows uses
-LOCALAPPDATA/APPDATA, native file locks and a Start shortcut. Windows hook/MCP
-launchers wait for their child runtime rather than relying on POSIX `execv`
-semantics. The adapter resolves the private interpreter across Codex cache copies.
-macOS and Claude Code integration are not shipped in 0.3.0.
-
-The Stop payload provides completed text when available, not partial streams,
-Codex's UI locale or native menu text. An embedded settings panel can record the
-host locale; Desktop otherwise falls back to the system locale. No accessibility
-capture, OCR or screen scraping is implemented. Optional window tracking reads
-application identity, focus and bounds only; it never reads text or modifies the
-Codex process. Windows uses typed Win32 APIs; Linux uses EWMH through python-xlib.
-The Qt follower converts monitor coordinates, retains drag offsets for the run,
-and hides its windows when Codex is minimized or inactive. Linux attachment uses
-XCB so Qt can position its own windows under XWayland. Native Wayland Codex windows
-are outside this backend's scope. Missing backends or lost display connections
-leave the manual button usable. A detected window does not identify the active
-chat; the inbox selector remains the source of reply selection. Attached Desktop
-defers inference until the reader opens, then reuses completed results for both
-display modes and subsequent show/hide operations.
-
-Desktop's bridge has no network listener. The optional web settings server binds
-only to loopback and checks its session token, Origin and Host. Offline inference uses
-installed local models; setup/model installation uses upstream network downloads.
-Chat integration still runs within the user's ordinary Codex service/session.
-
-`Service` selects an engine for each request from persisted `provider` (missing
-means `offline`). `Service(engine=...)` injection still takes precedence. Engines
-implement the existing `route`, `routes`, `fingerprint`, `translate` methods;
-the registry accommodates DeepL without changing Markdown, caching or rendering.
-Cache fingerprints include provider identity and engine version/languages, never
-credentials. Azure uses urllib REST v3 with redirects refused and sanitized errors.
-Only source fragments leave the process. Credential Manager on Windows and the
-owner-only Linux credentials file are available only to native backend code;
-MCP/web UI report a configured boolean. Usage metadata is atomically written under
-a process lock. Azure timeout is 15 seconds per request. Engine cancellation is
-cooperative at request boundaries; in-flight synchronous I/O waits for the bounded
-timeout. Desktop retains its revision guard to discard obsolete results.
-
-The optional Windows manual-message adapter lives in `message_adapter.py` and
-`web/message-buttons.js`. It selects one app://- main renderer through fixed
-loopback CDP, validates default main-frame binding events, and sends only clicked
-completed messages to the existing reader worker. The committed React child tree
-supplies message identity and Markdown. Buttons sit outside copied text; message
-bodies and app files remain unchanged. Context resets cancel pending reader work.
-The private UI contract is experimental and needs native compatibility testing.
-
-`cache_lifetime: session` uses the Cache interface with bounded process memory.
-Full reader results follow the same policy and bypass saved SQLite translations;
-original history stays in the inbox. Clear cache clears both translation stores,
-preserving originals. Defaults remain disk caching and automatic translation.
+One source-installer ZIP per OS contains the same manual reader. Installation keeps
+models and unrelated preferences while persisting profile migration. Message buttons
+currently require Windows; Linux retains manual Paste and graphical Qt dependencies.
+Regular GitHub releases publish only after Windows/Linux regressions and fresh ZIP
+installation, real Offline table translation, hooks, Qt and upgrade checks pass.
+Unit tests use controlled adapter/DOM/protocol fixtures and never certify all private
+Codex renderer versions or automate a user's live Codex UI.

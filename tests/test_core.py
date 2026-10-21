@@ -50,9 +50,9 @@ class CoreTests(unittest.TestCase):
         update_settings(target="ja", ui_language="fr", mode="translated")
         self.assertEqual(load_settings().target, "ja")
         self.assertEqual(load_settings().ui_language, "fr")
-        self.assertEqual(context(), "")
+        self.assertIn("manual per-message", context())
         update_settings(enabled=False)
-        self.assertEqual(context(), "")
+        self.assertIn("manual per-message", context())
 
     def test_invalid_preferences_do_not_damage_previous_settings(self):
         with self.assertRaises(TwinTextError):
@@ -139,7 +139,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(self.service.translate("Hello", mode="original")["display"], "Hello")
         self.assertEqual(self.service.translate("Hello", target="en")["display"], "Hello")
         update_settings(enabled=False)
-        self.assertEqual(context(), "")
+        self.assertIn("manual per-message", context())
         self.assertIn("译:Hello", self.service.translate("Hello")["display"])
 
     def test_cache_reuse_clear_and_model_version_invalidation(self):

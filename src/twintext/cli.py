@@ -8,13 +8,10 @@ from pathlib import Path
 from twintext import __version__
 from twintext.config import (
     CACHE_LIFETIMES,
-    CHAT_PRESENTATIONS,
     LANGUAGES,
     MODES,
     PROVIDERS,
-    RESPONSE_SCOPES,
     TRANSLATION_LANGUAGES,
-    WORKFLOWS,
     TwinTextError,
     load_settings,
     update_settings,
@@ -33,26 +30,15 @@ def parser():
     translate.add_argument("--target", choices=list(TRANSLATION_LANGUAGES))
     translate.add_argument("--mode", choices=MODES)
     translate.add_argument("--json", action="store_true")
-    delivery = commands.add_parser("send-to-reader", help="Forward original text to floating Chat")
-    delivery.add_argument("file", nargs="?", help="UTF-8 file; omit or use - for stdin")
-    delivery.add_argument("--kind", choices=("final", "progress", "question"), default="progress")
-    delivery.add_argument("--session-id", default="codex")
-    delivery.add_argument("--turn-id", default="")
     settings = commands.add_parser("settings", help="Read or save settings")
     settings.add_argument("--provider", choices=PROVIDERS)
     settings.add_argument("--source", choices=["auto", *TRANSLATION_LANGUAGES])
-    settings.add_argument("--workflow", choices=WORKFLOWS)
-    settings.add_argument("--response-scope", choices=RESPONSE_SCOPES)
-    settings.add_argument("--chat-presentation", choices=CHAT_PRESENTATIONS)
-    settings.add_argument("--translate-questions", choices=["true", "false"])
     settings.add_argument("--target", choices=list(TRANSLATION_LANGUAGES))
     settings.add_argument("--mode", choices=MODES)
     settings.add_argument("--ui-language", choices=["auto", *LANGUAGES])
     settings.add_argument("--enabled", choices=["true", "false"])
     settings.add_argument("--cache", choices=["true", "false"])
     settings.add_argument("--cache-lifetime", choices=CACHE_LIFETIMES)
-    settings.add_argument("--message-buttons", choices=["true", "false"])
-    settings.add_argument("--desktop-auto-start", choices=["true", "false"])
     settings.add_argument("--always-on-top", choices=["true", "false"])
     settings.add_argument("--follow-codex", choices=["true", "false"])
     commands.add_parser("status", help="Inspect settings and installed models")
@@ -69,7 +55,7 @@ def parser():
     commands.add_parser("clear-cache", help="Remove cached translations")
     commands.add_parser("mcp", help="Serve local MCP over stdio")
     context_command = commands.add_parser(
-        "context", help="Emit instructions only when Chat workflow is selected"
+        "context", help="Explain manual per-reply translation"
     )
     context_command.add_argument("--session-id")
     context_command.add_argument("--turn-id")
@@ -140,37 +126,24 @@ def main(argv=None):
             key = getpass.getpass("Azure resource key (hidden): ")
             save_credentials(key, region)
             print("Azure credentials configured. Select Azure explicitly in settings to use them.")
-        elif args.command == "send-to-reader":
-            from twintext.bridge import send_to_reader
-
-            text = (Path(args.file).read_text(encoding="utf-8")
-                    if args.file and args.file != "-" else sys.stdin.read())
-            print(json.dumps(send_to_reader(text, args.kind, args.session_id, args.turn_id)))
         elif args.command == "settings":
             changes = {
                 key: getattr(args, key)
                 for key in (
                     "provider",
                     "source",
-                    "workflow",
-                    "response_scope",
-                    "chat_presentation",
-                    "translate_questions",
                     "target",
                     "mode",
                     "ui_language",
                     "enabled",
                     "cache",
                     "cache_lifetime",
-                    "message_buttons",
-                    "desktop_auto_start",
                     "always_on_top",
                     "follow_codex",
                 )
                 if getattr(args, key) is not None
             }
-            for key in ("enabled", "cache", "desktop_auto_start", "always_on_top",
-                        "translate_questions", "follow_codex", "message_buttons"):
+            for key in ("enabled", "cache", "always_on_top", "follow_codex"):
                 if key in changes:
                     changes[key] = changes[key] == "true"
             value = update_settings(**changes) if changes else load_settings()

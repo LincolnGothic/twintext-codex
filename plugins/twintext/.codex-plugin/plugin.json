@@ -1,7 +1,7 @@
 {
   "name": "twintext",
-  "version": "0.9.3",
-  "description": "Offline, Azure and experimental Google Free Chat/Desktop translation for Codex on Windows and Linux.",
+  "version": "0.10.0",
+  "description": "Manual translation reader for Codex with Offline, Azure and experimental Google Free providers.",
   "author": {
     "name": "LincolnGothic"
   },
@@ -20,8 +20,8 @@
   "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "TwinText",
-    "shortDescription": "Offline, Azure or Google Free translation in chat or a floating window",
-    "longDescription": "Choose in-chat or floating-window translations, bilingual or translated-only, with independent translation and interface languages.",
+    "shortDescription": "Per-reply Translate / Original buttons and a separate reader",
+    "longDescription": "Click Translate on a completed Codex reply, including older replies, or use manual Paste. Read bilingual or translated text separately; Copy original preserves the source.",
     "developerName": "LincolnGothic",
     "category": "Productivity",
     "capabilities": [
@@ -35,7 +35,7 @@
     "brandColor": "#4F46C8",
     "defaultPrompt": [
       "Open TwinText settings",
-      "Translate this reply with TwinText"
+      "Open the TwinText reader"
     ]
   }
 }
