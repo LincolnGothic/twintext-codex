@@ -55,8 +55,9 @@ def windows_launchers(app):
         f'@echo off\r\nstart "" "{pythonw}" -m twintext.cli desktop\r\n', encoding="utf-8"
     )
     (app / "Open Codex with TwinText.cmd").write_text(
-        f'@echo off\r\n"{str(python).replace("%", "%%")}" -m twintext.cli codex-launch\r\n'
-        'if errorlevel 1 pause\r\n', encoding="utf-8",
+        f'@echo off\r\n"{str(python).replace("%", "%%")}" -m twintext.cli codex-launch --wait\r\n'
+        'if errorlevel 130 exit /b 130\r\nif errorlevel 1 pause\r\n',
+        encoding="utf-8", newline="",
     )
     # Per-user Start menu shortcut; no PATH, registry, or machine configuration edits.
     start = Path(os.environ.get("APPDATA", str(Path.home() / "AppData/Roaming")))

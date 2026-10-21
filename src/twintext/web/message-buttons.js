@@ -7,10 +7,10 @@
   if (!config || typeof window[config.binding] !== "function") return;
   const words = {
     en:["Translate", "Original", "Translate this reply in TwinText", "Show original in TwinText", "Translation failed; click to retry"],
-    zh:["译", "原文", "在 TwinText 中翻译这条回复", "在 TwinText 中显示原文", "翻译失败，点击重试"],
-    ja:["翻訳", "原文", "この返信を TwinText で翻訳", "TwinText で原文を表示", "翻訳に失敗しました。クリックして再試行"],
-    fr:["Traduire", "Original", "Traduire cette réponse dans TwinText", "Afficher l’original dans TwinText", "Échec de traduction ; cliquez pour réessayer"],
-    es:["Traducir", "Original", "Traducir esta respuesta en TwinText", "Mostrar el original en TwinText", "Error al traducir; pulsa para reintentar"]
+    zh:["Translate", "Original", "在 TwinText 中翻译这条回复", "在 TwinText 中显示原文", "翻译失败，点击重试"],
+    ja:["Translate", "Original", "この返信を TwinText で翻訳", "TwinText で原文を表示", "翻訳に失敗しました。クリックして再試行"],
+    fr:["Translate", "Original", "Traduire cette réponse dans TwinText", "Afficher l’original dans TwinText", "Échec de traduction ; cliquez pour réessayer"],
+    es:["Translate", "Original", "Traducir esta respuesta en TwinText", "Mostrar el original en TwinText", "Error al traducir; pulsa para reintentar"]
   }[config.language] || ["Translate", "Original", "Translate this reply in TwinText", "Show original in TwinText", "Translation failed; click to retry"];
   const records = new Map();
   const requests = new Map();

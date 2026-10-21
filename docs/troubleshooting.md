@@ -79,6 +79,19 @@ system-move request; behavior depends on the desktop/window manager.
 That prompt follows an error; pressing a key closes the terminal instead of
 continuing startup. Read the TwinText error above it.
 
+Version **0.9.2** changes the Windows launcher to wait instead of failing when the
+shared app is running. Open **Open Codex with TwinText.cmd** first and leave its
+terminal open. When it says **Waiting**, choose Quit/Exit in Codex and its shared
+ChatGPT app, including any background/tray instance. The launcher continues
+automatically after those processes exit. **Ctrl+C** cancels without closing apps.
+It still cannot add debugging options to a running app. Native button labels use
+**Translate / Original** in every language; tooltips retain the interface language.
+
+Startup stages and errors are saved in `desktop/launcher.log` within TwinText's
+data folder, even after the terminal closes. It contains startup metadata and
+errors, not conversation text or translation credentials. CLI users can run
+`twintext codex-launch --wait`; without `--wait`, an existing app is still an error.
+
 If it says Codex is running, exit both Codex and its shared ChatGPT app normally,
 including any background/tray instance, before double-clicking **Open Codex with
 TwinText.cmd** in File Explorer. Closing a chat window alone can leave the app
