@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from twintext.cli import main, parser
-from twintext.codex_launcher import launch, windows_app
+from twintext.codex_launcher import launch, linux_app, linux_running, windows_app
 from twintext.config import TwinTextError, update_settings
 
 
@@ -199,6 +199,99 @@ class LauncherTests(unittest.TestCase):
             with self.assertRaisesRegex(TwinTextError, "settings"):
                 launch()
             inspect.assert_not_called()
-        with patch("twintext.codex_launcher.sys.platform", "linux"):
+        with patch("twintext.codex_launcher.sys.platform", "darwin"):
             with self.assertRaisesRegex(TwinTextError, "Windows"):
                 launch()
+
+
+@unittest.skipUnless(sys.platform.startswith("linux"), "Linux desktop discovery")
+class LinuxLauncherTests(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+        environment = patch.dict(os.environ, TWINTEXT_HOME=folder.name)
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.executable = self.folder / "app/ChatGPT"
+        self.executable.parent.mkdir()
+        self.executable.write_bytes(b"fixture")
+        self.executable.chmod(0o700)
+        resources = self.executable.parent / "resources"
+        resources.mkdir()
+        (resources / "app.asar").write_bytes(b"fixture")
+        update_settings(enabled=True)
+        self.process = Mock()
+        self.process.poll.return_value = None
+
+    def test_native_discovery_and_override_reject_the_codex_cli(self):
+        with (patch.dict(os.environ, TWINTEXT_CODEX_EXECUTABLE=str(self.executable)),
+              patch("twintext.codex_launcher.linux_running", return_value=True)):
+            self.assertEqual(linux_app(), (self.executable, True))
+        cli = self.executable.parent / "resources/codex"
+        cli.write_bytes(b"fixture")
+        cli.chmod(0o700)
+        with patch.dict(os.environ, TWINTEXT_CODEX_EXECUTABLE=str(cli)):
+            with self.assertRaisesRegex(TwinTextError, "desktop app"):
+                linux_app()
+
+    def test_shell_launcher_resolves_to_sibling_gui(self):
+        wrapper = self.executable.parent / "codex-launcher"
+        wrapper.write_text("#!/bin/sh\n", encoding="utf-8")
+        with (patch.dict(os.environ, TWINTEXT_CODEX_EXECUTABLE=""),
+              patch("twintext.codex_launcher.shutil.which", return_value=str(wrapper)),
+              patch("twintext.codex_launcher.linux_running", return_value=False),
+              patch.object(Path, "is_file", autospec=True,
+                           side_effect=lambda path: str(path).startswith(str(self.folder))
+                           and path.exists())):
+            self.assertEqual(linux_app(), (self.executable, False))
+
+    def test_process_detection_uses_executable_path_including_deleted_binary(self):
+        proc = self.folder / "proc"
+        proc.mkdir()
+        process = proc / "123"
+        process.mkdir()
+        link = process / "exe"
+        link.symlink_to(self.folder / "unrelated/codex")
+        self.assertFalse(linux_running(self.executable, proc))
+        link.unlink()
+        link.symlink_to(self.executable)
+        self.assertTrue(linux_running(self.executable, proc))
+        link.unlink()
+        link.symlink_to(str(self.executable) + " (deleted)")
+        self.assertTrue(linux_running(self.executable, proc))
+        link.unlink()
+        self.assertFalse(linux_running(self.executable, proc))
+        with self.assertRaisesRegex(TwinTextError, "/proc"):
+            linux_running(self.executable, self.folder / "missing-proc")
+
+    def test_existing_linux_app_is_not_restarted(self):
+        with (patch("twintext.codex_launcher.linux_app", return_value=(self.executable, True)),
+              patch("twintext.codex_launcher.subprocess.Popen") as spawn,
+              patch("twintext.codex_launcher.launch_desktop") as reader):
+            with self.assertRaisesRegex(TwinTextError, "Exit Codex"):
+                launch()
+            spawn.assert_not_called()
+            reader.assert_not_called()
+
+    def test_linux_wait_launches_detached_with_loopback_flags_after_normal_exit(self):
+        with (patch("twintext.codex_launcher.linux_app", side_effect=[
+                  (self.executable, True), (self.executable, False)]),
+              patch("twintext.codex_launcher.check_port"),
+              patch("twintext.codex_launcher.subprocess.Popen", return_value=self.process) as spawn,
+              patch("socket.create_connection"),
+              patch.dict(os.environ, ELECTRON_RUN_AS_NODE="1"),
+              patch("time.sleep") as sleep,
+              patch("twintext.codex_launcher.launch_desktop") as reader):
+            sleep.side_effect = lambda _seconds: spawn.assert_not_called()
+            self.assertTrue(launch(wait=True)["launched"])
+            self.assertEqual(spawn.call_args.args[0], [
+                str(self.executable), "--remote-debugging-address=127.0.0.1",
+                "--remote-debugging-port=9223",
+            ])
+            self.assertTrue(spawn.call_args.kwargs["start_new_session"])
+            self.assertNotIn("creationflags", spawn.call_args.kwargs)
+            self.assertNotIn("ELECTRON_RUN_AS_NODE", spawn.call_args.kwargs["env"])
+            reader.assert_called_once_with()
+            self.process.kill.assert_not_called()
+            self.process.terminate.assert_not_called()

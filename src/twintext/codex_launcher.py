@@ -1,6 +1,8 @@
-"""Explicit Windows launcher for the optional message adapter; never closes Codex."""
+"""Explicit Windows/Linux launcher for message buttons; never closes Codex."""
 
 import json
+import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -12,6 +14,53 @@ from twintext import __version__
 from twintext.bridge import launch_desktop
 from twintext.config import TwinTextError, config_dir, data_dir, load_settings, private_dir
 from twintext.message_adapter import PORT
+
+
+def linux_running(executable, proc_root=Path("/proc")):
+    """Match this user's GUI executable, never the unrelated Codex CLI by name."""
+    try:
+        processes = list(proc_root.iterdir())
+    except OSError as exc:
+        raise TwinTextError("Cannot check running Codex apps through /proc.") from exc
+    for process in processes:
+        if not process.name.isdigit():
+            continue
+        try:
+            if process.stat().st_uid != os.getuid():
+                continue
+            # An app upgrade can unlink an executable that is still running.
+            target = str((process / "exe").readlink()).removesuffix(" (deleted)")
+            if Path(target) == executable:
+                return True
+        except OSError:
+            continue  # Other users, protected helpers, and processes that just exited.
+    return False
+
+
+def linux_app():
+    override = os.environ.get("TWINTEXT_CODEX_EXECUTABLE")
+    if override:
+        candidates = [Path(override).expanduser()]
+    else:
+        candidates = [Path("/usr/lib/chatgpt/ChatGPT"), Path("/usr/lib/codex/Codex")]
+        for name in ("chatgpt", "codex"):
+            located = shutil.which(name)
+            if located:
+                candidate = Path(located).resolve()
+                # The native package's shell launcher execs its sibling ChatGPT.
+                candidates.extend([candidate, *(candidate.parent / binary
+                                                for binary in ("ChatGPT", "Codex", "codex"))])
+    for candidate in candidates:
+        executable = candidate.resolve()
+        if (executable.name.lower() in ("chatgpt", "codex")
+                and executable.is_file() and os.access(executable, os.X_OK)
+                and (executable.parent / "resources/app.asar").is_file()):
+            return executable, linux_running(executable)
+    raise TwinTextError(
+        "Cannot locate the installed Linux Codex desktop app. "
+        "Set TWINTEXT_CODEX_EXECUTABLE to its ChatGPT/Codex executable "
+        "beside resources/app.asar, not the Codex command-line tool."
+    )
 
 
 def windows_app():
@@ -77,9 +126,9 @@ def wait_for_debugging(process):
 
 
 def launch(wait=False):
-    if sys.platform != "win32":
+    if sys.platform != "win32" and not sys.platform.startswith("linux"):
         raise TwinTextError(
-            "The experimental per-message launcher currently supports Windows only."
+            "The experimental per-message launcher supports Windows and Linux."
         )
     path = private_dir(data_dir() / "desktop") / "launcher.log"
     with path.open("a", encoding="utf-8") as log:
@@ -112,7 +161,8 @@ def _launch(wait, report):
         raise TwinTextError(
             "Enable Translate buttons in TwinText settings before starting Codex."
         )
-    executable, running = windows_app()
+    inspect_app = windows_app if sys.platform == "win32" else linux_app
+    executable, running = inspect_app()
     if running and not wait:
         raise TwinTextError(
             "Exit Codex and its shared ChatGPT app, including any background/tray instance, "
@@ -127,15 +177,21 @@ def _launch(wait, report):
         )
         while running:
             time.sleep(2)
-            executable, running = windows_app()
+            executable, running = inspect_app()
     check_port()
     report(f"Starting: {executable}")
+    if sys.platform == "win32":
+        options = {"creationflags": (getattr(subprocess, "DETACHED_PROCESS", 0)
+                                     | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))}
+    else:
+        environment = os.environ.copy()
+        environment.pop("ELECTRON_RUN_AS_NODE", None)
+        options = {"start_new_session": True, "env": environment}
     process = subprocess.Popen(
         [str(executable), "--remote-debugging-address=127.0.0.1",
          f"--remote-debugging-port={PORT}"],
-        creationflags=(getattr(subprocess, "DETACHED_PROCESS", 0)
-                       | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        **options,
     )
     wait_for_debugging(process)
     report(f"Debugging port ready: 127.0.0.1:{PORT}")

@@ -56,6 +56,14 @@ def main():
         subprocess.run(installer, env=environment, check=True, timeout=600)
         app = base / ("Local/TwinText" if windows else "data/twintext")
         python = str(app / ("venv/Scripts/python.exe" if windows else "venv/bin/python"))
+        if not windows:
+            launcher = app / "Open Codex with TwinText.sh"
+            assert launcher.is_file() and os.access(launcher, os.X_OK)
+            assert "codex-launch --wait" in launcher.read_text(encoding="utf-8")
+            entry = base / "data/applications/twintext-codex.desktop"
+            assert "Name=Codex with TwinText" in entry.read_text(encoding="utf-8")
+            assert "Terminal=true" in entry.read_text(encoding="utf-8")
+            subprocess.run(["sh", "-n", str(launcher)], check=True, timeout=10)
 
         def run(*command, text=None):
             return subprocess.run(
@@ -119,13 +127,14 @@ def main():
         subprocess.run([python, "-c", probe], env=environment, check=True, timeout=30)
         # An upgrade must retain independent preferences and existing models.
         run("settings", "--ui-language", "fr", "--mode", "translated",
-            "--cache-lifetime", "session")
+            "--cache-lifetime", "session", "--follow-codex", "true")
         upgrade = [*installer, "-WithoutEngine"] if windows else [*installer, "--without-engine"]
         subprocess.run(upgrade, env=environment, check=True, timeout=300)
         final = json.loads(run("settings").stdout)
         assert final["workflow"] == "chat" and final["message_buttons"]
         assert final["ui_language"] == "fr" and final["mode"] == "translated"
         assert final["cache_lifetime"] == "session"
+        assert final["follow_codex"] is True
         assert len(json.loads(run("models", "list").stdout)) == 1
         print(f"{args.platform}: installer, preservation, hooks, UTF-8, tables and Qt passed")
 

@@ -18,16 +18,18 @@ fallback. Inline-chat translation and automatic Desktop capture/forwarding are r
   enabled state, pin/follow and cache policy are independent. Save only requested
   preferences. Do not request retired workflow, scope, question, message-mode or
   automatic-start settings; the public settings tool/CLI no longer accept them.
-- Windows per-reply buttons require the dedicated Open Codex with TwinText.cmd
-  launcher. If it reports Waiting, the user leaves its terminal open and quits Codex
+- Per-reply buttons require the dedicated Open Codex with TwinText.cmd launcher on
+  Windows, or the Codex with TwinText application-menu entry on Linux
+  (`twintext codex-launch --wait`). If it reports Waiting, the user leaves its terminal open and quits Codex
   and its shared ChatGPT app normally, including tray instances. Never close/restart
   an active Codex session for the user. The launcher pins installation paths and logs
   settings provenance. It never patches Codex application files.
 - The adapter is experimental and depends on private Codex message props. Unsupported
   messages have no button; never substitute the latest reply or clipboard. Existing
   buttons may reconnect by opening TwinText again if Codex already has its local
-  debugging connection. Otherwise the user uses the dedicated launcher. Linux uses
-  manual Paste; the Windows launcher is not supported there.
+  debugging connection. Otherwise the user uses the dedicated launcher. Linux native
+  packages use the same adapter through their desktop executable, never the Codex CLI.
+  Manual Paste remains available on both platforms.
 - The reader's Original action cancels pending translation; Translate shows it again.
   Copy original preserves exact source Markdown. Selecting history shows original
   text first and waits for a click. Old valid profiles migrate to this method;

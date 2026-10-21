@@ -63,7 +63,7 @@ def parser():
     desktop = commands.add_parser("desktop", help="Open the floating desktop reader")
     desktop.add_argument("--background", action="store_true", help="Start as a compact button")
     launcher = commands.add_parser(
-        "codex-launch", help="Launch Windows Codex with optional message buttons"
+        "codex-launch", help="Launch Codex with optional message buttons on Windows/Linux"
     )
     launcher.add_argument(
         "--wait", action="store_true", help="Wait for the existing app to exit normally"
