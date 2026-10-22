@@ -482,6 +482,7 @@ class Translator:
         self.service = service or Service()
         self.jobs = queue.Queue(maxsize=1)
         self.results = queue.SimpleQueue()
+        self.progress = queue.Queue(maxsize=1)
         self.cancelled = threading.Event()
         threading.Thread(target=self.run, daemon=True, name="twintext-model").start()
 
@@ -501,8 +502,18 @@ class Translator:
         while True:
             revision, text, source, target, cancelled = self.jobs.get()
             try:
+                def report(value, revision=revision, cancelled=cancelled):
+                    if cancelled.is_set():
+                        return
+                    try:
+                        self.progress.get_nowait()
+                    except queue.Empty:
+                        pass
+                    self.progress.put_nowait((revision, value))
+
                 result = self.service.translate(
-                    text, source=source, target=target, mode="translated", cancel=cancelled
+                    text, source=source, target=target, mode="translated", cancel=cancelled,
+                    progress=report,
                 )
                 self.results.put((revision, result, None))
             except Exception as exc:
@@ -586,6 +597,7 @@ class Companion(QWidget):
         self.revision = 0
         self.text = ""
         self.last_result = None
+        self.partial_result = None
         self.show_translation = self.settings.mode != "original"
         self.paste_visible = False
         self.reply_id = None
@@ -1104,6 +1116,7 @@ class Companion(QWidget):
         self.revision += 1
         self.cancel_translation()
         self.last_result = None
+        self.partial_result = None
         self.show_translation = (self.settings.mode != "original" if show_translation is None
                                  else show_translation)
         self.toggle_button.setEnabled(bool(self.text))
@@ -1139,7 +1152,19 @@ class Companion(QWidget):
             cancel()
 
     def render_result(self):
+        position = self.reader.verticalScrollBar().value()
         self.reader.setMarkdown(display_text(self.last_result, self.reader_mode()))
+        self.reader.verticalScrollBar().setValue(position)
+
+    def render_progress(self, result):
+        self.partial_result = result
+        scroll = self.reader.verticalScrollBar()
+        position = scroll.value()
+        self.reader.setMarkdown(display_text(result, self.reader_mode()))
+        scroll.setValue(position)
+        counts = result["progress"]
+        percent = min(99, 100 * counts["completed"] // max(1, counts["total"]))
+        self.status.setText(self.t("working") + f" {percent}%")
 
     def reader_mode(self):
         if not self.show_translation:
@@ -1215,6 +1240,17 @@ class Companion(QWidget):
                 self.sessions.setCurrentIndex(self.sessions.findData(self.reply_id))
                 self.sessions.blockSignals(False)
             while True:
+                updates = getattr(self.translator, "progress", None)
+                if updates is None:
+                    break
+                try:
+                    revision, result = updates.get_nowait()
+                except queue.Empty:
+                    break
+                if (revision == self.revision and self.show_translation
+                        and self.last_result is None and self.status_key == "working"):
+                    self.render_progress(result)
+            while True:
                 try:
                     revision, result, error = self.translator.results.get_nowait()
                 except queue.Empty:
@@ -1222,6 +1258,8 @@ class Companion(QWidget):
                 if revision != self.revision:
                     continue
                 if error:
+                    self.partial_result = None
+                    self.reader.setMarkdown(self.text)
                     self.message_feedback("error")
                     self.show_translation = False
                     self.toggle_button.setText(self.t("translate"))
@@ -1230,6 +1268,7 @@ class Companion(QWidget):
                 else:
                     self.message_feedback("ready")
                     self.last_result = result
+                    self.partial_result = None
                     if self.pending_translation and self.pending_translation[0] is not None:
                         self.inbox.save_translation(*self.pending_translation, result)
                     self.render_result()

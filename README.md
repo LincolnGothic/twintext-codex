@@ -10,13 +10,13 @@ host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 Google Free (experimental) is an optional keyless online provider. Offline remains the default.
 
-[Download 0.11.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.11.0) ·
+[Download 0.12.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.12.0) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
 ## One method: click a reply, read separately
 
-TwinText 0.11.0 keeps **per-reply Translate / Original → a separate reader**.
+TwinText 0.12.0 keeps **per-reply Translate / Original → a separate reader**.
 Inline-chat translation and automatic Desktop capture have been removed. Scrolling,
 new replies and changing settings never start a translation. Original Codex messages
 and their native Copy action stay unchanged.
@@ -92,8 +92,8 @@ One package per operating system, containing the same manual reader:
 
 | Operating system | Download | Checksums |
 | --- | --- | --- |
-| Windows | [Windows ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.11.0/TwinText-0.11.0-windows.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.11.0/SHA256SUMS-windows.txt) |
-| Linux | [Linux ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.11.0/TwinText-0.11.0-linux.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.11.0/SHA256SUMS-linux.txt) |
+| Windows | [Windows ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.0/TwinText-0.12.0-windows.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.0/SHA256SUMS-windows.txt) |
+| Linux | [Linux ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.0/TwinText-0.12.0-linux.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.0/SHA256SUMS-linux.txt) |
 
 Check SHA-256 against the checksum file. These are source/installer archives;
 Python, dependencies and models are separate downloads. Windows packages are unsigned.
@@ -162,6 +162,26 @@ languages, display, enabled state, cache policy, credentials, models and origina
 The old workflow, scope, question and automatic-start CLI/settings controls are retired.
 
 ## Languages, formats and controls
+
+### Long replies
+
+The reader shows completed paragraphs while the rest of a manually selected reply
+is translating, with a percentage indicator. Pending text remains in its original
+language. **Original**, another reply selection, or a settings change cancels the
+previous request; late progress cannot replace the current reply. Copy original
+always copies the exact source, including while translation is in progress.
+
+Google Free groups short, uncached visible fragments into bounded requests and reuses
+network connections. Batch boundaries must survive unchanged; otherwise it falls
+back to individual fragments for that engine run. Code, paths, numbers, link targets
+and Markdown structure remain protected. Existing cached translations are retained.
+In a synthetic 11,042-character formatted article with mocked network responses,
+requests fell from 157 to 6. This measures request count, not a promised wall-clock
+speedup; actual timing depends on the network, Google, and any batching fallback.
+
+These improvements apply to both Windows and Linux. Offline and Azure keep their
+selected providers and also support paragraph progress in the reader. No reply or
+scroll event starts translation automatically.
 
 Translation and interface languages are independent. The interface supports English,
 Chinese, Japanese, French and Spanish. Automatic follows the saved host/system locale;
@@ -329,7 +349,7 @@ selection, cancellation, mutation/recycling and original-text preservation. Thes
 do not certify every native Codex version or compositor behavior.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.11.0.md). Report OS/Python/Codex/TwinText versions,
+and [release notes](docs/release-0.12.0.md). Report OS/Python/Codex/TwinText versions,
 language pair, and a sanitized example; do not post private chats or databases.
 
 ## Remove TwinText

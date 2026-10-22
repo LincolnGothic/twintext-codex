@@ -21,6 +21,7 @@ license files are authoritative; the list is not a license grant for their code.
 | SentencePiece | [Apache 2.0](https://github.com/google/sentencepiece/blob/master/LICENSE) |
 | langdetect | [Apache 2.0](https://github.com/Mimino666/langdetect/blob/master/LICENSE) |
 | markdown-it-py | [MIT](https://github.com/executablebooks/markdown-it-py/blob/master/LICENSE) |
+| HTTPX | [Project license](https://github.com/encode/httpx/blob/master/LICENSE.md) |
 | PySide6/Qt | [LGPLv3/GPLv3 or commercial](https://doc.qt.io/qtforpython-6/licenses.html) |
 
 If you redistribute a bundled executable or dependency binaries, perform a new

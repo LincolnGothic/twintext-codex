@@ -64,6 +64,23 @@ ignores old disk translations. Disabling cache stops both reads/writes. Clearing
 translations preserves originals, settings and models; clearing received history
 is separate. Window exit releases session caches and cancels pending translation.
 
+## Translation performance
+
+The shared service collects visible fragment dependencies through the existing
+Markdown renderer, resolves existing cache entries, and deduplicates work within a
+request. Google Free packs uncached fragments under the existing encoded URL budget.
+Fresh per-request markers must remain complete, ordered and unique before results
+are assigned to fragments; a failed boundary check disables batching for that engine
+and uses individual requests. A single process lock still serializes Google requests.
+An HTTPX pool reuses one connection while retaining proxy/TLS configuration, response
+size limits, retry handling and redirect rejection. Cookies are not retained.
+
+Completed source blocks produce throttled previews; untranslated tails remain source.
+The worker retains only its newest preview. The reader checks the request revision,
+current Original/Translate state and completion status before displaying progress.
+Only complete successful results enter received-reply translation history. Failures
+restore the source view; cancellation or another selection invalidates late previews.
+
 ## Packaging and validation
 
 One source-installer ZIP per OS contains the same manual reader. Installation keeps

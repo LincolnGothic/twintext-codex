@@ -272,14 +272,15 @@ class GoogleFreeTests(unittest.TestCase):
     def test_service_auto_paragraphs_cache_and_setting_restore(self):
         update_settings(provider="google-free", source="auto", target="zh-TW")
         self.assertEqual(load_settings().provider, "google-free")
-        engine = self.engine([b'[[["First translated"]]]', b'[[["Second translated"]]]'])
+        engine = self.engine([b'[[["Batch markers were removed"]]]',
+                              b'[[["First translated"]]]', b'[[["Second translated"]]]'])
         service = Service(engine, detector=lambda _: self.fail("Google auto must reach provider"))
         result = service.translate("First paragraph.\n\nSecond paragraph.")
         self.assertEqual(result["original"], "First paragraph.\n\nSecond paragraph.")
         self.assertEqual(result["translation"], "First translated\n\nSecond translated")
-        self.assertEqual(len(self.sent), 2)
+        self.assertEqual(len(self.sent), 3)
         service.translate(result["original"])
-        self.assertEqual(len(self.sent), 2)
+        self.assertEqual(len(self.sent), 3)
         update_settings(provider="offline", target="zh")
         self.assertEqual(load_settings().provider, "offline")
         self.assertNotIn("Offline translation stays", self._google_context())

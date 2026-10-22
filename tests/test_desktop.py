@@ -26,6 +26,7 @@ from twintext.service import Service  # noqa: E402
 class PendingTranslator:
     def __init__(self):
         self.results = queue.SimpleQueue()
+        self.progress = queue.Queue(maxsize=1)
         self.jobs = []
 
     def submit(self, *job):
@@ -537,6 +538,57 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(self.window.reader.toPlainText(), "Second")
         self.deliver_result()
         self.assertIn("译:Second", self.window.reader.toPlainText())
+
+    def test_partial_progress_is_visible_but_never_saved_as_a_completed_translation(self):
+        text = "First paragraph.\n\nSecond paragraph."
+        self.click_reply(text=text)
+        revision = self.worker.jobs[-1][0]
+        progress = []
+        final = self.service.translate(text, mode="translated", progress=progress.append)
+        self.worker.progress.put((revision, progress[0]))
+        self.window.poll()
+        self.assertIn("译:First paragraph.", self.window.reader.toPlainText())
+        self.assertIn("Second paragraph.", self.window.reader.toPlainText())
+        self.assertIn("%", self.window.status.text())
+        self.assertIsNone(self.window.last_result)
+        self.assertIsNone(self.inbox.translation(*self.window.pending_translation))
+        self.window.copy()
+        self.assertEqual(self.app.clipboard().text(), text)
+        self.worker.results.put((revision, final, None))
+        self.window.poll()
+        self.assertEqual(self.window.last_result, final)
+        self.assertEqual(self.window.status_key, "ready")
+        self.assertEqual(self.inbox.translation(*self.window.pending_translation), final)
+
+    def test_stale_partial_results_cannot_replace_a_new_reply_or_original_view(self):
+        self.click_reply(text="First paragraph.\n\nSecond paragraph.")
+        revision = self.worker.jobs[-1][0]
+        progress = []
+        self.service.translate(self.window.text, progress=progress.append)
+        self.click_reply(turn="next", text="Different answer")
+        self.worker.progress.put((revision, progress[0]))
+        self.window.poll()
+        self.assertEqual(self.window.reader.toPlainText(), "Different answer")
+        self.window.toggle_translation()
+        self.worker.progress.put((self.window.revision, progress[0]))
+        self.window.poll()
+        self.assertEqual(self.window.reader.toPlainText(), "Different answer")
+
+    def test_failure_after_partial_output_restores_exact_source(self):
+        text = "First paragraph.\n\nSecond paragraph."
+        self.click_reply(text=text)
+        revision = self.worker.jobs[-1][0]
+        progress = []
+        self.service.translate(text, progress=progress.append)
+        self.worker.progress.put((revision, progress[0]))
+        self.window.poll()
+        self.worker.results.put((revision, None, "Fixture failure"))
+        self.window.poll()
+        self.assertEqual(self.window.reader.toPlainText(), "First paragraph.\nSecond paragraph.")
+        self.window.copy()
+        self.assertEqual(self.app.clipboard().text(), text)
+        self.assertIsNone(self.window.last_result)
+        self.assertIsNone(self.inbox.translation(*self.window.pending_translation))
 
     def test_display_modes_switch_without_new_inference_after_translation(self):
         self.click_reply(text="Hello")
