@@ -2,6 +2,7 @@
 
 import re
 import threading
+import time
 from dataclasses import replace
 
 from twintext import providers
@@ -37,7 +38,7 @@ class Service:
                 self._provider = provider
             return self._engine
 
-    def translate(self, text, source=None, target=None, mode=None, cancel=None):
+    def translate(self, text, source=None, target=None, mode=None, cancel=None, progress=None):
         def check_cancel():
             if cancel is not None and cancel.is_set():
                 raise TwinTextError("Translation cancelled.")
@@ -82,67 +83,115 @@ class Service:
         cache = (Cache(memory=settings.cache_lifetime == "session")
                  if settings.cache and needs_translation else None)
 
-        def translate_fragment(fragment):
+        source_blocks = blocks(text)
+        dependencies = []
+        keys, values = {}, {}
+        cached = set()
+        pending = []
+
+        def collect(fragment):
             nonlocal cache_hits
             check_cancel()
-            key = Cache.key(fragment, source, settings.target, fingerprint)
-            value = cache.get(key) if cache else None
-            if value is not None:
+            if fragment not in keys:
+                key = Cache.key(fragment, source, settings.target, fingerprint)
+                keys[fragment] = key
+                value = cache.get(key) if cache else None
+                if value is not None:
+                    values[fragment] = value
+                    cached.add(fragment)
+                else:
+                    pending.append(fragment)
+            if fragment in cached:
                 cache_hits += 1
-                return value
-            value = (
-                engine.translate(fragment, source, settings.target, cancel=cancel)
-                if cancel is not None and getattr(engine, "provider", "offline") != "offline"
-                else engine.translate(fragment, source, settings.target)
-            )
-            check_cancel()
-            if not isinstance(value, str) or not value.strip():
-                raise TwinTextError("The local model returned an empty translation.")
-            if cache:
-                cache.put(key, value)
-            return value
+            dependencies[-1].add(fragment)
+            return fragment
 
-        def translate_header(fragment):
-            # This very short field is ambiguous to the local model (e.g. it
-            # returned “termination reason” for English Quantity → Chinese).
-            # Apply the glossary only to table headers, never to ordinary prose.
+        def header(fragment, translate):
             if fragment.casefold() == QUANTITY_HEADER.get(source, "").casefold():
                 return QUANTITY_HEADER[settings.target]
-            return translate_fragment(fragment)
+            return translate(fragment)
 
         references = reference_ids(text)
-        for block in blocks(text):
+        # Collect exactly the spans used by the existing Markdown renderer. Opaque
+        # code, destinations, paths, numbers and structural tokens never enter a batch.
+        for block in source_blocks:
+            dependencies.append(set())
+            if needs_translation and block.translatable:
+                translate_block(block.original, collect, block.kind, references,
+                                lambda fragment: header(fragment, collect))
+
+        cursor = completed = 0
+        last_preview = None
+        total = sum(len(block.original) for block in source_blocks if block.translatable)
+
+        def result(complete):
+            remaining = source_blocks[cursor:]
+            tail = "".join(block.original for block in remaining)
+            return {
+                "source": source, "target": settings.target, "mode": settings.mode,
+                "original": text, "translation": "".join(translated) + tail,
+                "display": "".join(rendered) + tail,
+                "blocks": pairs + [{"original": block.original, "translation": block.original,
+                                     "protected": not block.translatable} for block in remaining],
+                "route": [source, *route] if route else [source], "cache_hits": cache_hits,
+                "complete": complete,
+                "progress": {"completed": completed, "total": total},
+            }
+
+        def render_ready():
+            nonlocal cursor, completed, last_preview
+            previous = cursor
+            while cursor < len(source_blocks) and dependencies[cursor].issubset(values):
+                check_cancel()
+                block = source_blocks[cursor]
+                value = (translate_block(
+                    block.original, values.__getitem__, block.kind, references,
+                    lambda fragment: header(fragment, values.__getitem__),
+                ) if needs_translation and block.translatable else block.original)
+                translated.append(value)
+                pairs.append({"original": block.original, "translation": value,
+                              "protected": not block.translatable})
+                rendered.append(
+                    block.original.rstrip("\n") + "\n\n" + value
+                    if settings.mode == "bilingual" and value != block.original else value)
+                completed += len(block.original) if block.translatable else 0
+                cursor += 1
+            if (progress is not None and completed and cursor != previous
+                    and cursor < len(source_blocks)
+                    and (last_preview is None or time.monotonic() - last_preview >= 0.1)):
+                check_cancel()
+                last_preview = time.monotonic()
+                progress(result(False))
+
+        def sequential():
+            for index, fragment in enumerate(pending):
+                check_cancel()
+                value = (engine.translate(fragment, source, settings.target, cancel=cancel)
+                         if cancel is not None
+                         and getattr(engine, "provider", "offline") != "offline"
+                         else engine.translate(fragment, source, settings.target))
+                yield index, value
+
+        render_ready()
+        iterator = getattr(engine, "iter_translations", None)
+        updates = (iterator(pending, source, settings.target, cancel=cancel)
+                   if pending and iterator is not None else sequential())
+        seen = set()
+        for index, value in updates:
             check_cancel()
-            value = (
-                translate_block(
-                    block.original, translate_fragment, block.kind, references, translate_header
-                )
-                if needs_translation and block.translatable
-                else block.original
-            )
-            translated.append(value)
-            pairs.append(
-                {
-                    "original": block.original,
-                    "translation": value,
-                    "protected": not block.translatable,
-                }
-            )
-            if settings.mode == "bilingual" and value != block.original:
-                rendered.append(block.original.rstrip("\n") + "\n\n" + value)
-            else:
-                rendered.append(value)
-        return {
-            "source": source,
-            "target": settings.target,
-            "mode": settings.mode,
-            "original": text,
-            "translation": "".join(translated),
-            "display": "".join(rendered),
-            "blocks": pairs,
-            "route": [source, *route] if route else [source],
-            "cache_hits": cache_hits,
-        }
+            if (type(index) is not int or not 0 <= index < len(pending) or index in seen
+                    or not isinstance(value, str) or not value.strip()):
+                raise TwinTextError("The translation provider returned an invalid fragment.")
+            seen.add(index)
+            fragment = pending[index]
+            values[fragment] = value
+            if cache:
+                cache.put(keys[fragment], value)
+            render_ready()
+        check_cancel()
+        if cursor != len(source_blocks):
+            raise TwinTextError("The translation provider returned an incomplete result.")
+        return result(True)
 
     def status(self):
         settings = load_settings()

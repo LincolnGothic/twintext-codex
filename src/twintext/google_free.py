@@ -3,6 +3,7 @@
 import json
 import math
 import re
+import secrets
 import ssl
 import threading
 import time
@@ -12,7 +13,7 @@ from http.client import HTTPException
 from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, build_opener
+from urllib.request import Request
 
 from twintext.config import TwinTextError, data_dir, private_dir
 from twintext.locking import acquire_lock
@@ -23,6 +24,26 @@ LANGUAGES = {"auto": "auto", "en": "en", "zh": "zh-CN", "zh-CN": "zh-CN",
              "ja": "ja", "fr": "fr", "es": "es"}
 # Conservative local URL budget (including percent encoding), not a Google quota.
 MAX_URL_LENGTH = 1800
+MAX_BATCH_FRAGMENTS = 32
+
+
+def pack_fragments(texts, nonce):
+    markers = [f"__TT{nonce}_{index}__" for index in range(len(texts) + 1)]
+    value = "\n".join(part for pair in zip(markers[:-1], texts, strict=True) for part in pair)
+    return value + "\n" + markers[-1], markers
+
+
+def unpack_fragments(value, markers):
+    """Reject changed, missing, repeated or reordered boundaries before mapping text."""
+    value = value.strip()
+    pattern = re.compile(r"__TT" + re.escape(markers[0][4:].split("_")[0]) + r"_\d+__")
+    matches = list(pattern.finditer(value))
+    if ([match[0] for match in matches] != markers or not matches
+            or matches[0].start() != 0 or matches[-1].end() != len(value)):
+        return None
+    output = [value[left.end():right.start()].strip()
+              for left, right in zip(matches[:-1], matches[1:], strict=True)]
+    return output if all(output) else None
 
 
 def google_language(code):
@@ -94,10 +115,52 @@ class GoogleFreeEngine:
     provider = "google-free"
 
     def __init__(self, opener=None, timeout=15):
-        from twintext.providers import NoRedirect
+        from twintext.google_transport import GoogleTransport
 
-        self.opener = opener or build_opener(NoRedirect()).open
+        self.transport = None if opener is not None else GoogleTransport()
+        self.opener = opener if opener is not None else self.transport.open
         self.timeout = timeout
+        self.batching = True
+
+    def close(self):
+        if self.transport is not None:
+            self.transport.close()
+
+    def iter_translations(self, texts, source, target, cancel=None):
+        """Yield indexed, complete fragments after each bounded request batch."""
+        cancel = cancel or threading.Event()
+        self.check_cancel(cancel)
+        nonce = secrets.token_hex(6)
+        while any(nonce in text for text in texts):
+            nonce = secrets.token_hex(6)
+        batches, batch = [], []
+        for index, text in enumerate(texts):
+            candidate = [value for _, value in batch] + [text]
+            packed, _ = pack_fragments(candidate, nonce)
+            if batch and (len(candidate) > MAX_BATCH_FRAGMENTS
+                          or len(google_url(packed, source, target)) > MAX_URL_LENGTH):
+                batches.append(batch)
+                batch = []
+            batch.append((index, text))
+        if batch:
+            batches.append(batch)
+        for batch in batches:
+            self.check_cancel(cancel)
+            values = None
+            if self.batching and len(batch) > 1:
+                packed, markers = pack_fragments([text for _, text in batch], nonce)
+                values = unpack_fragments(self.translate(packed, source, target, cancel), markers)
+                if values is None:
+                    self.batching = False  # Avoid repeated failed batch probes this run.
+            if values is None:
+                for index, text in batch:
+                    yield index, self.translate(text, source, target, cancel)
+            else:
+                for (index, text), value in zip(batch, values, strict=True):
+                    self.check_cancel(cancel)
+                    leading = text[:len(text) - len(text.lstrip())]
+                    trailing = text[len(text.rstrip()):]
+                    yield index, leading + value + trailing
 
     def route(self, source, target):
         source, target_code = google_language(source), google_language(target)

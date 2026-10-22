@@ -1,9 +1,16 @@
 # TwinText troubleshooting
 
-TwinText 0.11.0 uses only per-reply Translate / Original and a separate reader.
+TwinText 0.12.0 uses only per-reply Translate / Original and a separate reader.
 Manual Paste remains the fallback. Inline and automatic Desktop modes are retired.
 
 ## Text stays in its original language
+
+For a long reply, pending paragraphs stay original while finished paragraphs appear
+with a translation progress percentage. This does not change the saved display mode.
+Google Free uses fewer requests when batch boundaries are preserved and otherwise
+falls back to individual fragments; network delays or rate limiting can still slow
+it down. Existing cache entries remain useful. Original cancels the active request;
+Copy original retains the complete source even before translation finishes.
 
 Set the correct source and target: English → English stays unchanged. Test with
 English → Chinese and Bilingual using a public sentence and Paste → Translate.
