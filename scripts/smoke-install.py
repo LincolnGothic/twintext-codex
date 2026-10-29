@@ -122,7 +122,14 @@ def main():
             "assert 'location' not in window.selects; assert window.settings.manual_reader; "
             "window.reader.setMarkdown(" + repr(TABLE) + "); "
             "assert 'Fresh red apples' in window.reader.toPlainText(); "
-            "window.quit(); adapter.stop(); print('Native Qt and manual hooks passed')"
+            "window.expand(); window.close_button.click(); "
+            "assert not window.quitting and window.timer.isActive(); "
+            "assert not window.isVisible() and not window.orb.isVisible(); "
+            "from twintext.bridge import Inbox; Inbox().activate(); window.poll(); "
+            "assert window.isVisible(); window.orb.close(); "
+            "assert not window.quitting and not window.isVisible(); "
+            "window.quit(); adapter.stop(); "
+            "print('Native Qt, close/reopen and manual hooks passed')"
         )
         subprocess.run([python, "-c", probe], env=environment, check=True, timeout=30)
         # An upgrade must retain independent preferences and existing models.

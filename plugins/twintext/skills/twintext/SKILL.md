@@ -24,6 +24,11 @@ fallback. Inline-chat translation and automatic Desktop capture/forwarding are r
   and its shared ChatGPT app normally, including tray instances. Never close/restart
   an active Codex session for the user. The launcher pins installation paths and logs
   settings provenance. It never patches Codex application files.
+- Closing either reader window hides TwinText and cancels unfinished translation,
+  while keeping per-reply buttons, completed session results and paste drafts.
+  A reply click or opening TwinText restores it. The reader's separate Quit action
+  exits the process. The dedicated Codex launcher reuses an existing supported local
+  debugging connection, so reopening TwinText does not require restarting Codex.
 - The adapter is experimental and depends on private Codex message props. Unsupported
   messages have no button; never substitute the latest reply or clipboard. Existing
   buttons may reconnect by opening TwinText again if Codex already has its local

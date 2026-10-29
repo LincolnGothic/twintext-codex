@@ -140,6 +140,25 @@ for (const language of ["en", "zh", "ja", "fr", "es"]) {
 window.__twintextMessages.stop();
 assert.equal(document.querySelectorAll("[data-twintext-translate]").length, 0);
 assert.equal(first.body.textContent, first.props.item.content);
+
+// A reader process can quit and reconnect to the same Codex document. Recreate
+// the binding/document identity without reloading the host or mounting replies.
+const reconnects = [];
+delete window.fixtureBinding;
+window.reconnectedBinding = raw => reconnects.push(JSON.parse(raw));
+window.TWINTEXT_MESSAGE_CONFIG = {binding:"reconnectedBinding", document:"reconnected-document", language:"en"};
+window.eval(script);
+await settle();
+assert.equal(first.root.querySelectorAll("[data-twintext-translate]").length, 1);
+assert.equal(button(first).textContent, "Translate");
+assert.equal(reconnects.length, 0, "Reconnecting must not translate");
+button(first).click();
+assert.deepEqual(reconnects[0], {document:"reconnected-document", request:1, action:"translate", session:"thread-1", message:"old-1", text:first.props.item.content});
+window.__twintextMessages.feedback({document:"fixture-document", request:1, state:"original"});
+assert.equal(button(first).textContent, "Original", "Feedback from the old reader must be ignored");
+assert.equal(first.body.textContent, first.props.item.content);
+assert.equal(clipboardCalls, 0);
+window.__twintextMessages.stop();
 dom.window.close();
 
 const early = new JSDOM("<!doctype html><html><body></body></html>", {runScripts:"outside-only"});

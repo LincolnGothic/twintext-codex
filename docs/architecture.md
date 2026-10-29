@@ -42,6 +42,16 @@ entry points are inert for old registrations. Reader settings never close the re
 through a workflow change. Opening a reader can reconnect its adapter if the existing
 Codex process already has the expected debugging endpoint.
 
+Closing either TwinText window dismisses both windows without stopping the reader
+process, polling timer or message adapter. Window following respects this dismissed
+state until an explicit reply click or reader activation restores it. Dismissal
+cancels unfinished translation, invalidates its revision and resets the selected
+message button to Translate. Completed results, session caches and paste drafts stay
+in memory. The separate Quit action shuts down the adapter and releases session state.
+The dedicated launcher also reuses an already running Codex instance when discovery
+finds exactly one supported main window on the fixed loopback debugging endpoint;
+otherwise its existing normal-exit requirement remains in effect.
+
 Inbox preserves original history and completed reader results. At initialization,
 retained old Desktop reply rows are inserted idempotently into history with original
 text and timestamps. Existing rows are never replaced. History sorts by created
@@ -62,7 +72,8 @@ Default disk caching retains the existing bounded fragment policy and persisted
 reader results. Session lifetime stores both kinds in bounded process memory and
 ignores old disk translations. Disabling cache stops both reads/writes. Clearing
 translations preserves originals, settings and models; clearing received history
-is separate. Window exit releases session caches and cancels pending translation.
+is separate. Quit/process exit releases session caches; hiding a window cancels
+pending translation while retaining completed session results.
 
 ## Translation performance
 

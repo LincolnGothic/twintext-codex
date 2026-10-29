@@ -122,6 +122,45 @@ class FollowTests(unittest.TestCase):
         self.window.follower.tick()
         self.assertTrue(self.window.isVisible())
 
+    def test_dismissed_windows_stay_hidden_across_focus_and_follow_settings(self):
+        self.window.expand()
+        self.tracker.foreground = 7777
+        self.window.follower.tick()
+        self.assertTrue(self.window.follower.hidden)
+        self.window.close_button.click()
+        for foreground in (self.tracker.target.id, 7777, self.tracker.target.id):
+            self.tracker.foreground = foreground
+            self.window.poll()
+            self.assertFalse(self.window.isVisible())
+            self.assertFalse(self.window.orb.isVisible())
+        update_settings(follow_codex=False)
+        self.window.poll()
+        self.assertFalse(self.window.isVisible())
+        self.assertFalse(self.window.orb.isVisible())
+        self.assertEqual(self.worker.jobs, [])
+        self.inbox.activate()
+        self.window.poll()
+        self.assertTrue(self.window.isVisible())
+        self.assertTrue(self.window.orb.isVisible())
+        self.assertEqual(self.worker.jobs, [])
+
+    def test_explicit_reply_click_reopens_a_dismissed_following_reader(self):
+        self.window.orb.close()
+        adapter = self.window.message_adapter
+        self.window.poll()
+        self.assertFalse(self.window.orb.isVisible())
+        self.assertEqual(self.worker.jobs, [])
+        adapter.events.put({
+            "document": "fixture", "request": 1, "action": "translate",
+            "session": "thread", "message": "chosen", "text": "Exact chosen reply",
+        })
+        self.window.poll()
+        self.assertIs(self.window.message_adapter, adapter)
+        self.assertTrue(self.window.reader_open)
+        self.assertTrue(self.window.isVisible())
+        self.assertTrue(self.window.orb.isVisible())
+        self.assertEqual(self.worker.jobs[-1][1], "Exact chosen reply")
+
     def test_following_reader_translates_only_after_explicit_reply_selection(self):
         self.inbox.publish(payload(text="Hello world."), archive=True)
         self.window.poll()

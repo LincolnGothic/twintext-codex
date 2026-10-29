@@ -464,6 +464,16 @@ for _language, _labels in {
     WORDS[_language].update(zip(("empty", "waiting"), _labels, strict=True))
 
 
+for _language, _label in {
+    "en": "Hide reader · Translate buttons stay available",
+    "zh": "隐藏阅读器 · 保留 Translate 按钮",
+    "ja": "リーダーを隠す · Translate ボタンは引き続き利用できます",
+    "fr": "Masquer le lecteur · Les boutons Translate restent disponibles",
+    "es": "Ocultar el lector · Los botones Translate siguen disponibles",
+}.items():
+    WORDS[_language]["hide_reader"] = _label
+
+
 def display_text(result, mode):
     if mode == "original":
         return result["original"]
@@ -594,6 +604,7 @@ class Companion(QWidget):
         self.settings = load_settings()
         self.quitting = False
         self.reader_open = False
+        self.dismissed = False
         self.revision = 0
         self.text = ""
         self.last_result = None
@@ -629,7 +640,7 @@ class Companion(QWidget):
         self.collapse_button.setFixedWidth(36)
         self.close_button = QPushButton("×")
         self.close_button.setFixedWidth(36)
-        self.close_button.clicked.connect(self.quit)
+        self.close_button.clicked.connect(self.close)
         header_layout.addWidget(self.settings_button)
         header_layout.addWidget(self.collapse_button)
         header_layout.addWidget(self.close_button)
@@ -744,11 +755,11 @@ class Companion(QWidget):
         self.orb_button.setMinimumSize(116, 36)
         self.orb_button.clicked.connect(self.orb_clicked)
         panel_layout.addWidget(self.orb_button)
-        self.orb_quit_button = QPushButton("×")
-        self.orb_quit_button.setObjectName("orbQuit")
-        self.orb_quit_button.setFixedSize(28, 36)
-        self.orb_quit_button.clicked.connect(self.quit)
-        panel_layout.addWidget(self.orb_quit_button)
+        self.orb_close_button = QPushButton("×")
+        self.orb_close_button.setObjectName("orbClose")
+        self.orb_close_button.setFixedSize(28, 36)
+        self.orb_close_button.clicked.connect(self.orb.close)
+        panel_layout.addWidget(self.orb_close_button)
         orb_layout.addWidget(panel)
         self.orb.setFixedSize(196, 48)
         self.follower = WindowFollower(self)
@@ -828,13 +839,13 @@ class Companion(QWidget):
         self.locale_hint.setText(self.t("locale_hint"))
         self.editor.setPlaceholderText(self.t("placeholder"))
         self.collapse_button.setToolTip(self.t("collapse"))
-        self.close_button.setToolTip(self.t("quit"))
-        self.close_button.setAccessibleName(self.t("quit"))
+        self.close_button.setToolTip(self.t("hide_reader"))
+        self.close_button.setAccessibleName(self.t("hide_reader"))
         self.orb_handle.setToolTip(self.t("drag"))
         self.orb_handle.setAccessibleName(self.t("drag"))
         self.update_orb_label()
-        self.orb_quit_button.setToolTip(self.t("quit"))
-        self.orb_quit_button.setAccessibleName(self.t("quit"))
+        self.orb_close_button.setToolTip(self.t("hide_reader"))
+        self.orb_close_button.setAccessibleName(self.t("hide_reader"))
         self.checks["cache"].setToolTip(self.t("cache_hint"))
         self.checks["session_cache"].setToolTip(self.t("session_cache_hint"))
         self.buttons_hint.setText(self.t("buttons_hint"))
@@ -965,6 +976,7 @@ class Companion(QWidget):
     def expand(self):
         if self.quitting:
             return
+        self.dismissed = False
         self.reader_open = True
         self.orb.show()
         area = self.orb.screen().availableGeometry()
@@ -988,9 +1000,33 @@ class Companion(QWidget):
     def collapse(self):
         if self.quitting:
             return
+        self.dismissed = False
         self.hide()
         self.reader_open = False
         self.orb.show()
+        self.orb_button.setChecked(False)
+        self.update_orb_label()
+        self.follower.tick()
+
+    def dismiss(self):
+        """Hide the UI while keeping the manual message connection and session alive."""
+        if self.quitting:
+            return
+        self.revision += 1
+        self.cancel_translation()
+        self.partial_result = None
+        if self.status_key == "working":
+            self.show_translation = False
+            self.reader.setMarkdown(self.text)
+            self.toggle_button.setText(self.t("translate"))
+            self.status_key = "ready" if self.text else "waiting"
+            self.update_status()
+        self.message_feedback("original")
+        self.message_request = None
+        self.reader_open = False
+        self.dismissed = True
+        self.hide()
+        self.orb.hide()
         self.orb_button.setChecked(False)
         self.update_orb_label()
         self.follower.tick()
@@ -1018,12 +1054,17 @@ class Companion(QWidget):
         QApplication.instance().quit()
 
     def closeEvent(self, event):
-        event.accept()
-        self.quit()
+        if self.quitting:
+            event.accept()
+        else:
+            event.ignore()
+            self.dismiss()
 
     def eventFilter(self, watched, event):
-        if watched is self.orb and event.type() == QEvent.Type.Close:
-            self.quit()
+        if watched is self.orb and event.type() == QEvent.Type.Close and not self.quitting:
+            event.ignore()
+            self.dismiss()
+            return True
         return super().eventFilter(watched, event)
 
     def paste(self):
@@ -1299,11 +1340,11 @@ padding: 14px; font-size: 14px; }
 QFrame#preferences { background: #eaf0fb; border-radius: 9px; }
 QFrame#orbPanel { background: #29355c; border: 1px solid #56658c; border-radius: 23px; }
 QFrame#orbPanel QWidget { background: transparent; }
-QPushButton#orbExpand, QPushButton#orbQuit { background: transparent; color: #f7f8ff; border: none;
+QPushButton#orbExpand, QPushButton#orbClose { background: transparent; color: #f7f8ff; border: none;
 border-radius: 18px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
-QPushButton#orbExpand:hover, QPushButton#orbQuit:hover { background: #3d4c78; }
+QPushButton#orbExpand:hover, QPushButton#orbClose:hover { background: #3d4c78; }
 QPushButton#orbExpand:checked { background: #4f46c8; }
-QPushButton#orbQuit { padding: 0; font-size: 18px; }
+QPushButton#orbClose { padding: 0; font-size: 18px; }
 QCheckBox { padding: 2px; }
 """
 

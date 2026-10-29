@@ -13,7 +13,7 @@ from pathlib import Path
 from twintext import __version__
 from twintext.bridge import launch_desktop
 from twintext.config import TwinTextError, config_dir, data_dir, load_settings, private_dir
-from twintext.message_adapter import PORT
+from twintext.message_adapter import PORT, discover
 
 
 def linux_running(executable, proc_root=Path("/proc")):
@@ -163,6 +163,16 @@ def _launch(wait, report):
         )
     inspect_app = windows_app if sys.platform == "win32" else linux_app
     executable, running = inspect_app()
+    if running:
+        try:
+            debugging = discover()
+        except (OSError, ValueError, TwinTextError):
+            debugging = None
+        if debugging:
+            report(f"Reusing the running Codex connection on 127.0.0.1:{PORT}.")
+            launch_desktop()
+            report("TwinText reader launch requested. Codex was not restarted.")
+            return {"launched": True, "experimental": True, "port": PORT, "reused": True}
     if running and not wait:
         raise TwinTextError(
             "Exit Codex and its shared ChatGPT app, including any background/tray instance, "
