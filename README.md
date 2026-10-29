@@ -10,13 +10,13 @@ host/system language. Offline (the default) runs locally after model downloads.
 Microsoft Azure Translator is an optional provider using your own credentials.
 Google Free (experimental) is an optional keyless online provider. Offline remains the default.
 
-[Download 0.12.0](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.12.0) ·
+[Download 0.12.1](https://github.com/LincolnGothic/twintext-codex/releases/tag/v0.12.1) ·
 [Installation](#install-or-upgrade) · [Troubleshooting](docs/troubleshooting.md) ·
 [Format coverage](docs/output-formats.md)
 
 ## One method: click a reply, read separately
 
-TwinText 0.12.0 keeps **per-reply Translate / Original → a separate reader**.
+TwinText 0.12.1 keeps **per-reply Translate / Original → a separate reader**.
 Inline-chat translation and automatic Desktop capture have been removed. Scrolling,
 new replies and changing settings never start a translation. Original Codex messages
 and their native Copy action stay unchanged.
@@ -48,6 +48,7 @@ current settings no longer contain location or automatic-translation selectors.*
    exit; **Ctrl+C** cancels waiting. TwinText never closes an active conversation.
 3. Open a completed reply and click **Translate**. Actions remain **Translate /
    Original** in every interface language, with localized tooltips.
+   Closing the reader keeps the buttons connected; another reply click reopens it.
 4. If buttons are unavailable, open the reader with **Open TwinText.cmd** and use
    **Paste text**. The legacy display-method selector has been removed, so settings
    changes no longer close the reader through a workflow switch.
@@ -74,7 +75,13 @@ settings/data paths. See [launcher troubleshooting](docs/troubleshooting.md#the-
    **Waiting**, leave the terminal open and quit Codex and its shared ChatGPT app
    normally. The launcher continues after exit; **Ctrl+C** cancels waiting.
 3. Open a completed assistant reply and click **Translate / Original**. Keep the
-   separate reader running. Scrolling, new messages and settings never translate.
+   separate reader running, including hidden in the background. Closing its window
+   keeps the buttons connected; another reply click reopens it. Scrolling, new
+   messages and settings never translate.
+
+On either platform, opening the dedicated launcher again reuses a supported running
+Codex debugging connection and reopens TwinText without restarting Codex. If Codex
+was started normally without that connection, the launcher still waits for normal exit.
 
 To keep the reader where you place it, turn off **Follow Codex window** in settings.
 This preference is independent of the message buttons and survives upgrades.
@@ -92,8 +99,8 @@ One package per operating system, containing the same manual reader:
 
 | Operating system | Download | Checksums |
 | --- | --- | --- |
-| Windows | [Windows ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.0/TwinText-0.12.0-windows.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.0/SHA256SUMS-windows.txt) |
-| Linux | [Linux ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.0/TwinText-0.12.0-linux.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.0/SHA256SUMS-linux.txt) |
+| Windows | [Windows ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.1/TwinText-0.12.1-windows.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.1/SHA256SUMS-windows.txt) |
+| Linux | [Linux ZIP](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.1/TwinText-0.12.1-linux.zip) | [SHA256SUMS](https://github.com/LincolnGothic/twintext-codex/releases/download/v0.12.1/SHA256SUMS-linux.txt) |
 
 Check SHA-256 against the checksum file. These are source/installer archives;
 Python, dependencies and models are separate downloads. Windows packages are unsigned.
@@ -191,8 +198,13 @@ Markdown tables, headings, lists, quotes and visible link text are supported. Co
 paths, numbers, link destinations and math remain protected. Bilingual tables show
 original and translated tables separately. See [format coverage](docs/output-formats.md).
 
-- **−** collapses the reader to a draggable button; **×** quits it. Drag the **T**
-  button deliberately, or drag the reader header. Resize from the bottom-right corner.
+- **−** collapses the reader to a draggable **T** button. **×** on either TwinText
+  window, or the window manager's Close action, hides the reader and button while
+  keeping Codex's Translate buttons available. A reply's **Translate / Original**
+  action or opening TwinText again restores the reader without restarting Codex.
+  Unfinished translation is cancelled; completed results and paste drafts remain.
+  Use **Quit** in the reader to exit TwinText and remove the Codex buttons.
+  Drag **T** deliberately, or drag the reader header. Resize from the bottom-right corner.
 - **Settings** replaces the reading area; **Back to reader** restores it. Dropdown
   wheels scroll settings without changing selections. Use clicks or keyboard keys.
 - The reply selector retains manually selected originals. Choosing history shows the
@@ -318,6 +330,7 @@ existing saved data.
 keeps fragments and full reader results together in bounded process memory (up to
 10,000 entries). No new translations are saved to disk; exit or shutdown releases
 them, including abnormal process exit. Existing disk translations are ignored.
+Hiding the reader with **×** keeps this session cache; **Quit** releases it.
 **Clear cache** removes old and current translations from both stores while
 preserving original history, models and settings. No shutdown script is needed.
 
@@ -349,7 +362,7 @@ selection, cancellation, mutation/recycling and original-text preservation. Thes
 do not certify every native Codex version or compositor behavior.
 
 Read [architecture](docs/architecture.md), [troubleshooting](docs/troubleshooting.md)
-and [release notes](docs/release-0.12.0.md). Report OS/Python/Codex/TwinText versions,
+and [release notes](docs/release-0.12.1.md). Report OS/Python/Codex/TwinText versions,
 language pair, and a sanitized example; do not post private chats or databases.
 
 ## Remove TwinText

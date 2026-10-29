@@ -23,6 +23,9 @@ class LauncherTests(unittest.TestCase):
         output = patch("sys.stderr", new_callable=io.StringIO)
         output.start()
         self.addCleanup(output.stop)
+        discovery = patch("twintext.codex_launcher.discover", return_value=None)
+        self.discover = discovery.start()
+        self.addCleanup(discovery.stop)
         self.executable = self.folder / "Codex.exe"
         self.executable.write_bytes(b"fixture")
         self.process = Mock()
@@ -76,6 +79,43 @@ class LauncherTests(unittest.TestCase):
             with self.assertRaisesRegex(TwinTextError, "Exit Codex"):
                 launch()
             spawn.assert_not_called()
+
+    def test_launcher_reopens_reader_on_existing_debugging_connection_without_restart(self):
+        self.discover.return_value = "ws://127.0.0.1:9223/devtools/page/main"
+        for wait in (False, True):
+            with (
+                self.subTest(wait=wait),
+                patch("twintext.codex_launcher.sys.platform", "win32"),
+                patch("twintext.codex_launcher.windows_app",
+                      return_value=(self.executable, True)),
+                patch("twintext.codex_launcher.subprocess.Popen") as spawn,
+                patch("twintext.codex_launcher.check_port") as check_port,
+                patch("twintext.codex_launcher.time.sleep") as sleep,
+                patch("twintext.codex_launcher.launch_desktop") as reader,
+            ):
+                self.assertTrue(launch(wait=wait)["reused"])
+                reader.assert_called_once_with()
+                spawn.assert_not_called()
+                check_port.assert_not_called()
+                sleep.assert_not_called()
+        self.assertIn("Codex was not restarted", (self.folder / "desktop/launcher.log").read_text())
+
+    def test_unavailable_or_invalid_debugging_connection_keeps_existing_exit_requirement(self):
+        for failure in (OSError("Unavailable"), ValueError("Invalid JSON"),
+                        TwinTextError("Invalid target list")):
+            with (
+                self.subTest(failure=failure),
+                patch("twintext.codex_launcher.sys.platform", "win32"),
+                patch("twintext.codex_launcher.windows_app",
+                      return_value=(self.executable, True)),
+                patch("twintext.codex_launcher.subprocess.Popen") as spawn,
+                patch("twintext.codex_launcher.launch_desktop") as reader,
+            ):
+                self.discover.side_effect = failure
+                with self.assertRaisesRegex(TwinTextError, "Exit Codex"):
+                    launch()
+                spawn.assert_not_called()
+                reader.assert_not_called()
 
     def test_failure_is_recorded_locally_after_terminal_dismissal(self):
         with (patch("twintext.codex_launcher.sys.platform", "win32"),
@@ -213,6 +253,9 @@ class LinuxLauncherTests(unittest.TestCase):
         environment = patch.dict(os.environ, TWINTEXT_HOME=folder.name)
         environment.start()
         self.addCleanup(environment.stop)
+        discovery = patch("twintext.codex_launcher.discover", return_value=None)
+        self.discover = discovery.start()
+        self.addCleanup(discovery.stop)
         self.executable = self.folder / "app/ChatGPT"
         self.executable.parent.mkdir()
         self.executable.write_bytes(b"fixture")
@@ -273,6 +316,24 @@ class LinuxLauncherTests(unittest.TestCase):
                 launch()
             spawn.assert_not_called()
             reader.assert_not_called()
+
+    def test_linux_launcher_reuses_debugging_connection_including_wait_mode(self):
+        self.discover.return_value = "ws://127.0.0.1:9223/devtools/page/main"
+        for wait in (False, True):
+            with (
+                self.subTest(wait=wait),
+                patch("twintext.codex_launcher.linux_app",
+                      return_value=(self.executable, True)),
+                patch("twintext.codex_launcher.subprocess.Popen") as spawn,
+                patch("twintext.codex_launcher.check_port") as check_port,
+                patch("twintext.codex_launcher.time.sleep") as sleep,
+                patch("twintext.codex_launcher.launch_desktop") as reader,
+            ):
+                self.assertTrue(launch(wait=wait)["reused"])
+                reader.assert_called_once_with()
+                spawn.assert_not_called()
+                check_port.assert_not_called()
+                sleep.assert_not_called()
 
     def test_linux_wait_launches_detached_with_loopback_flags_after_normal_exit(self):
         with (patch("twintext.codex_launcher.linux_app", side_effect=[

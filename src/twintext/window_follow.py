@@ -59,6 +59,10 @@ class WindowFollower(QObject):
 
     def tick(self):
         window = self.window
+        if window.dismissed:
+            self.close()
+            self.hidden = False
+            return
         enabled = window.settings.follow_codex and (
             window.settings.workflow == "desktop" or window.settings.floating_chat)
         if not enabled:

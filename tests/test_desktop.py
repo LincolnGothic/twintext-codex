@@ -329,40 +329,133 @@ class DesktopTests(unittest.TestCase):
             execute.assert_called_once_with()
             acquire.return_value.close.assert_called_once_with()
 
-    def test_close_quits_both_windows_and_preserves_preferences(self):
+    def test_close_controls_hide_windows_without_removing_message_buttons(self):
         saved = load_settings()
-        self.window.show()
+        adapter = self.window.message_adapter
+        self.window.editor.setPlainText("An unfinished paste draft")
         self.window.timer.start(300)
-        with patch.object(self.app, "quit") as quit_app:
-            self.assertTrue(self.window.close())
-            quit_app.assert_called_once_with()
-        self.assertFalse(self.window.isVisible())
-        self.assertFalse(self.window.orb.isVisible())
-        self.assertFalse(self.window.timer.isActive())
-        self.assertEqual(load_settings(), saved)
+        for close in (self.window.close_button.click, self.window.close,
+                      self.window.orb_close_button.click, self.window.orb.close):
+            with (
+                self.subTest(close=close),
+                patch.object(self.app, "quit") as quit_app,
+                patch.object(adapter, "close") as disconnect,
+            ):
+                self.window.expand()
+                close()
+                self.app.processEvents()
+                self.assertFalse(self.window.isVisible())
+                self.assertFalse(self.window.orb.isVisible())
+                self.assertFalse(self.window.reader_open)
+                self.assertTrue(self.window.timer.isActive())
+                self.assertFalse(self.window.quitting)
+                self.window.poll()
+                self.assertIs(self.window.message_adapter, adapter)
+                disconnect.assert_not_called()
+                quit_app.assert_not_called()
+                self.assertEqual(self.worker.jobs, [])
+                self.assertEqual(self.window.editor.toPlainText(), "An unfinished paste draft")
+                self.assertEqual(load_settings(), saved)
+        self.click_reply(text="Exact reply after closing the reader")
+        self.assertTrue(self.window.isVisible())
+        self.assertTrue(self.window.orb.isVisible())
+        self.assertIs(self.window.message_adapter, adapter)
+        self.assertEqual(self.worker.jobs[-1][1], "Exact reply after closing the reader")
 
-    def test_compact_quit_hides_both_windows_and_cancels_translation(self):
+    def test_explicit_quit_disconnects_buttons_and_clears_session_cache(self):
         saved = load_settings()
+        adapter = self.window.message_adapter
+        cache = Cache(memory=True)
+        cache.put("session-fixture", "A completed translation")
         self.window.collapse()
+        self.window.timer.start(300)
         with (
             patch.object(self.app, "quit") as quit_app,
             patch.object(self.window, "cancel_translation") as cancel,
+            patch.object(adapter, "close") as disconnect,
         ):
-            self.window.orb_quit_button.click()
+            self.window.quit_button.click()
+            self.window.quit()
             quit_app.assert_called_once_with()
             cancel.assert_called_once_with()
+            disconnect.assert_called_once_with()
         self.assertFalse(self.window.isVisible())
         self.assertFalse(self.window.orb.isVisible())
+        self.assertTrue(self.window.quitting)
+        self.assertFalse(self.window.timer.isActive())
+        self.assertIsNone(cache.get("session-fixture"))
         self.assertEqual(load_settings(), saved)
 
-    def test_native_compact_close_quits_both_windows(self):
-        self.window.collapse()
-        with patch.object(self.app, "quit") as quit_app:
-            self.assertTrue(self.window.orb.close())
-            quit_app.assert_called_once_with()
-        self.assertFalse(self.window.isVisible())
-        self.assertFalse(self.window.orb.isVisible())
+    def test_close_cancels_pending_manual_and_message_work_and_rejects_late_results(self):
+        for manual in (False, True):
+            with self.subTest(manual=manual):
+                text = ("Manual first paragraph.\n\nManual second paragraph." if manual
+                        else "First paragraph.\n\nSecond paragraph.")
+                if manual:
+                    self.window.expand()
+                    self.window.editor.setPlainText(text)
+                    self.window.translate_manual()
+                else:
+                    self.click_reply(text=text)
+                revision = self.window.revision
+                pending = self.window.pending_translation
+                progress = []
+                final = self.service.translate(text, progress=progress.append)
+                self.worker.progress.put((revision, progress[0]))
+                self.window.poll()
+                self.assertIsNotNone(self.window.partial_result)
+                with patch.object(self.window, "cancel_translation") as cancel:
+                    self.window.close_button.click()
+                    cancel.assert_called_once_with()
+                jobs = len(self.worker.jobs)
+                self.worker.progress.put((revision, progress[0]))
+                self.worker.results.put((revision, final, None))
+                self.window.poll()
+                self.assertGreater(self.window.revision, revision)
+                self.assertIsNone(self.window.partial_result)
+                self.assertIsNone(self.window.last_result)
+                self.assertFalse(self.window.show_translation)
+                self.assertNotEqual(self.window.status_key, "working")
+                self.assertIsNone(self.window.message_request)
+                self.assertEqual(self.window.message_adapter.feedbacks[-1][1], "original")
+                self.assertFalse(self.window.isVisible())
+                self.assertEqual(len(self.worker.jobs), jobs)
+                if pending[0] is not None:
+                    self.assertIsNone(self.inbox.translation(*pending))
+                self.window.copy()
+                self.assertEqual(self.app.clipboard().text(), text)
+                self.inbox.activate()
+                self.window.poll()
+                self.assertTrue(self.window.isVisible())
+                self.assertEqual(len(self.worker.jobs), jobs, "Reopening must not translate")
 
+    def test_close_preserves_completed_session_results_history_and_paste_drafts(self):
+        update_settings(cache_lifetime="session")
+        self.window.poll()
+        self.click_reply(text="Completed reply")
+        self.deliver_result()
+        result = self.window.last_result
+        rendered = self.window.reader.toPlainText()
+        history = self.inbox.history()
+        pending = self.window.pending_translation
+        jobs = len(self.worker.jobs)
+        self.window.paste()
+        self.window.editor.setPlainText("Keep this draft")
+        cache = Cache(memory=True)
+        cache.put("session-fixture", "Keep this cached fragment")
+        self.window.close_button.click()
+        self.assertEqual(cache.get("session-fixture"), "Keep this cached fragment")
+        self.assertEqual(self.inbox.history(), history)
+        self.assertEqual(self.inbox.translation(*pending), result)
+        self.inbox.activate()
+        self.window.poll()
+        self.assertTrue(self.window.isVisible())
+        self.assertEqual(self.window.reader.toPlainText(), rendered)
+        self.assertEqual(self.window.editor.toPlainText(), "Keep this draft")
+        self.assertEqual(self.window.message_adapter.feedbacks[-1][1], "original")
+        self.click_reply(text="Completed reply")
+        self.assertEqual(len(self.worker.jobs), jobs, "The same reply reuses its session result")
+        self.assertEqual(self.window.last_result, result)
 
     def test_manual_reader_in_chat_still_opens_for_settings(self):
         chat = update_settings(workflow="chat")

@@ -1,6 +1,6 @@
 # TwinText troubleshooting
 
-TwinText 0.12.0 uses only per-reply Translate / Original and a separate reader.
+TwinText 0.12.1 uses only per-reply Translate / Original and a separate reader.
 Manual Paste remains the fallback. Inline and automatic Desktop modes are retired.
 
 ## Text stays in its original language
@@ -25,15 +25,21 @@ Windows uses the runtime's TwinText.cmd for CLI commands. Model downloads are op
 
 ## The Translate button disappeared
 
+Closing a TwinText window now hides it while keeping Codex's Translate buttons
+connected. Click a reply's Translate / Original action to reopen it, or open TwinText
+again. Use the reader's separate **Quit** button only when you want to stop TwinText.
+
 The old display selector could close the reader when switching to inline mode.
 Version 0.10.0 removes that selector and the workflow-triggered close path. Older
 profiles migrate to the manual reader; changing provider/language/display/cache
 no longer switches integration methods.
 
 1. Check **Enable Translate buttons** in settings. A disabled integration does not
-   show message buttons. Keep the TwinText reader running, even when collapsed.
+   show message buttons. The TwinText process must be running; its windows can be hidden.
 2. If Codex was already opened through the dedicated launcher, reopen TwinText with
    **Open TwinText.cmd** or `twintext desktop` on Linux. Its adapter retries the connection.
+   The dedicated Codex-with-TwinText launcher also reuses this existing connection;
+   it does not ask you to restart a supported debugging instance.
 3. Otherwise use **Open Codex with TwinText.cmd** on Windows, or **Codex with TwinText**
    from the Linux applications menu (`twintext codex-launch --wait`). A normally launched
    Codex instance does not automatically have its debugging connection.
@@ -79,7 +85,12 @@ Settings replaces the reading area; Back restores it. Dropdown wheels scroll the
 settings rather than changing selection. Use clicks or keyboard keys.
 
 The compact button toggles the reader; drag **T** deliberately to move it. **−** collapses;
-**×** on either window quits TwinText. Follow/always-on-top depend on the window
+**×** or the window manager's Close action hides both TwinText windows while leaving
+the Codex buttons connected. Another reply click or explicit reader launch restores
+the windows. Closing cancels unfinished translation and rejects late results, keeping
+the original, completed translations and paste draft. Reopening alone does not start
+translation. **Quit** in the reader exits the process and removes the Codex buttons.
+Follow/always-on-top depend on the window
 manager. Follow supports Windows and X11/XWayland; native Wayland may require
 manual positioning. When inactive/minimized, an attached window can be hidden.
 Turn off **Follow Codex window** to keep the reader stationary while moving Codex;
@@ -110,7 +121,8 @@ received history only when explicitly requested.
 
 Session cache keeps fragments and complete reader translations in process memory
 until TwinText exits, including shutdown. Existing disk translations are ignored;
-no shutdown script is needed. Disk caching has no timed expiry. Turning caching off
+no shutdown script is needed. Hiding the reader with **×** retains session results;
+the separate **Quit** action releases them. Disk caching has no timed expiry. Turning caching off
 disables reads/writes while preserving existing data. See README for default paths.
 
 ## Google Free (experimental)
